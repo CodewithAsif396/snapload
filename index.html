@@ -494,9 +494,41 @@
                     };
 
                     const encodedUrl = encodeURIComponent(data.originalUrl);
-                    addFormat('MP4 Video (HD)', 'Best visual quality', 'video', 'purple', `/api/download?url=${encodedUrl}&type=hd`, 'HD');
-                    addFormat('MP4 Video (SD)', 'Saves bandwidth', 'video', 'blue', `/api/download?url=${encodedUrl}&type=sd`);
-                    addFormat('Audio (MP3/M4A)', 'Audio only track', 'music', 'pink', `/api/download?url=${encodedUrl}&type=audio`);
+                    
+                    // Render dynamic video formats based on available heights
+                    if (data.availableHeights && data.availableHeights.length > 0) {
+                        data.availableHeights.forEach((height, index) => {
+                            let color = 'blue';
+                            let badge = '';
+                            let title = `MP4 Video (${height}p)`;
+                            let desc = 'Standard quality video';
+
+                            if (height >= 1080) {
+                                color = 'purple';
+                                badge = height >= 1440 ? '4K/2K' : 'FHD';
+                                desc = 'Ultra High Definition';
+                            } else if (height >= 720) {
+                                color = 'indigo';
+                                badge = 'HD';
+                                desc = 'High Definition video';
+                            } else if (height <= 360) {
+                                color = 'gray';
+                                desc = 'Saves data bandwidth';
+                            }
+
+                            // If it's the absolute highest resolution available, highlight it slightly differently if we want,
+                            // but our color coding handles it.
+
+                            addFormat(title, desc, 'video', color, `/api/download?url=${encodedUrl}&type=${height}`, badge);
+                        });
+                    } else {
+                        // Fallback just in case
+                        addFormat('MP4 Video (HD)', 'Best visual quality', 'video', 'purple', `/api/download?url=${encodedUrl}&type=1080`, 'HD');
+                        addFormat('MP4 Video (SD)', 'Saves bandwidth', 'video', 'blue', `/api/download?url=${encodedUrl}&type=720`);
+                    }
+
+                    // Always add the Audio format
+                    addFormat('Audio (MP3)', 'Audio only track', 'music', 'pink', `/api/download?url=${encodedUrl}&type=audio`);
 
                     loadingArea.classList.add('hidden');
                     resultArea.classList.remove('hidden');

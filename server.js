@@ -43,6 +43,7 @@ app.post('/api/info', async (req, res) => {
             noWarnings: true,
             noCheckCertificate: true,
             preferFreeFormats: true,
+            noPlaylist: true,
             ffmpegLocation: ffmpegPath
         });
 
@@ -51,11 +52,23 @@ app.post('/api/info', async (req, res) => {
         const thumbnail = output.thumbnail || 'https://via.placeholder.com/600x400?text=No+Thumbnail';
         const duration = output.duration_string || output.duration ? new Date(output.duration * 1000).toISOString().substr(14, 5) : '00:00';
 
+        // Extract available resolutions dynamically
+        const formats = output.formats || [];
+        let availableHeights = [...new Set(
+            formats.filter(f => f.vcodec !== 'none' && f.height).map(f => f.height)
+        )].sort((a, b) => b - a);
+
+        // Fallback default heights if the platform doesn't report height cleanly
+        if (availableHeights.length === 0) {
+            availableHeights = [1080, 720, 360];
+        }
+
         // We return the raw URL back so the frontend can send it to our /api/download endpoint
         return res.json({
             title,
             thumbnail,
             duration,
+            availableHeights,
             originalUrl: url
         });
 
@@ -77,17 +90,15 @@ app.get('/api/download', (req, res) => {
     let ext = 'mp4';
     let mime = 'video/mp4';
 
-    if (type === 'hd') {
-        // High quality video merged with audio
-        format = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
-    } else if (type === 'sd') {
-        // Standard quality video (up to 720p)
-        format = 'best[height<=720][ext=mp4]/best';
-    } else if (type === 'audio') {
+    if (type === 'audio') {
         // Audio only extraction
         format = 'bestaudio/best';
         ext = 'mp3';
         mime = 'audio/mpeg';
+    } else {
+        // Handle specific heights
+        const height = parseInt(type) || 720;
+        format = `bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${height}][ext=mp4]/best`;
     }
 
     // Set headers to trigger a file download in the browser
@@ -102,6 +113,7 @@ app.get('/api/download', (req, res) => {
         f: format,
         noWarnings: true,
         noCheckCertificate: true,
+        noPlaylist: true,
         ffmpegLocation: ffmpegPath,
         extractAudio: type === 'audio',
         audioFormat: type === 'audio' ? 'mp3' : undefined,
