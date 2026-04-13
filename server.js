@@ -45,8 +45,9 @@ app.post('/api/info', async (req, res) => {
             noCheckCertificate: true,
             preferFreeFormats: true,
             noPlaylist: true,
+            extractorArgs: 'youtube:player_client=android', // Bypass YouTube bot protection!
             ffmpegLocation: ffmpegPath
-        });
+        }, { timeout: 15000 }); // Prevent backend from freezing indefinitely
 
         // Parse relevant info
         const title = output.title || 'Unknown Title';
@@ -115,11 +116,12 @@ app.get('/api/download', (req, res) => {
         noWarnings: true,
         noCheckCertificate: true,
         noPlaylist: true,
+        extractorArgs: 'youtube:player_client=android', // Bypass YouTube bot protection!
         ffmpegLocation: ffmpegPath,
         extractAudio: type === 'audio',
         audioFormat: type === 'audio' ? 'mp3' : undefined,
         o: '-' // '-' tells yt-dlp to output binary data directly to stdout instead of saving a file!
-    });
+    }, { timeout: 120000 }); // Prevent stream processes from sitting permanently if the network drops
 
     subprocess.stdout.pipe(res);
 
