@@ -1,7 +1,7 @@
 {
-  "name": "new-folder-(2)",
+  "name": "snapload",
   "version": "1.0.0",
-  "description": "",
+  "description": "Fast and premium social media video downloader proxy.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
