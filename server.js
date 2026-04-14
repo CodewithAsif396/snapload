@@ -103,7 +103,7 @@ function getDirectUrls(safeUrl, format) {
         const args = [
             safeUrl, '-f', format,
             '--no-warnings', '--no-check-certificate', '--no-playlist',
-            '--extractor-args', 'youtube:player_client=ios,android,web',
+            '--extractor-args', 'youtube:player_client=tv_embedded,ios,mweb',
             '--get-url',
         ];
         const proc  = spawn(YTDLP, args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -141,13 +141,13 @@ function pipeCdnUrl(cdnUrl, res, req, extraHeaders = {}) {
 }
 
 // ─── Merge video+audio via yt-dlp+ffmpeg streaming ───────────────────────────
-function spawnMergeStream(safeUrl, format, res, req) {
+function spawnMergeStream(safeUrl, format, res, req, extraArgs = []) {
     const args = [
         safeUrl,
         '-f', format,
         '--no-warnings', '--no-check-certificate', '--no-playlist',
-        '--extractor-args', 'youtube:player_client=ios,android,web',
         '--ffmpeg-location', ffmpegPath,
+        ...extraArgs,
         '-o', '-',
     ];
     const proc = spawn(YTDLP, args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -200,21 +200,53 @@ app.post('/api/info', rateLimit, async (req, res) => {
         else if (m.includes('HTTP Error 404'))                    msg = 'Video not found — please check the URL.';
         else if (m.includes('is not a valid URL') || m.includes('truncated')) msg = 'Invalid URL. Please copy the complete link directly.';
         else if (m.includes('No video') && m.includes('tweet'))  msg = 'X/Twitter now requires login to download videos. This tweet may have no video or be private.';
+        else if (m.includes('tiktok') || m.includes('TikTok'))   msg = 'Could not fetch TikTok video. The video may be private or region-restricted.';
         return res.status(500).json({ error: msg, details: m.slice(0, 300) });
     }
 });
 
+// ─── Platform-specific extra args for download ───────────────────────────────
+const YT_ARGS = [
+    '--extractor-args', 'youtube:player_client=tv_embedded,ios,mweb',
+];
+const TIKTOK_ARGS = [
+    '--add-header', 'referer:https://www.tiktok.com/',
+    '--add-header', 'origin:https://www.tiktok.com',
+    '--add-header', 'user-agent:Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    '--extractor-args', 'tiktok:api_hostname=api22-normal-c-useast2a.tiktokv.com',
+    '--no-check-formats',
+];
+const INSTAGRAM_ARGS = [
+    '--add-header', 'referer:https://www.instagram.com/',
+    '--add-header', 'origin:https://www.instagram.com',
+];
+const TWITTER_ARGS = [
+    '--add-header', 'referer:https://x.com/',
+    '--add-header', 'origin:https://x.com',
+    '--extractor-args', 'twitter:api=syndication',
+];
+
 // Download — smart routing:
 //   YouTube  → get-url first: 1 url = direct CDN pipe, 2 urls = ffmpeg merge
-//   Others   → yt-dlp stream directly (need cookies, CDN won't allow direct access)
+//   TikTok   → yt-dlp with mobile UA + TikTok extractor args
+//   Others   → yt-dlp stream directly
 app.get('/api/download', rateLimit, async (req, res) => {
     const { url, type } = req.query;
     if (!validateUrl(url)) return res.status(400).send('Invalid URL.');
 
-    const safeUrl               = sanitizeUrl(url);
-    const { format, ext, mime } = buildFormat(type);
-    const filename              = `snapload_${Date.now()}.${ext}`;
-    const isYouTube             = safeUrl.includes('youtube.com') || safeUrl.includes('youtu.be');
+    const safeUrl    = sanitizeUrl(url);
+    const isYouTube  = safeUrl.includes('youtube.com') || safeUrl.includes('youtu.be');
+    const isTikTok   = safeUrl.includes('tiktok.com');
+    const isInstagram = safeUrl.includes('instagram.com');
+    const isTwitter  = safeUrl.includes('x.com') || safeUrl.includes('twitter.com');
+
+    // TikTok serves combined video+audio — avoid split-stream format selector
+    const { format: rawFormat, ext, mime } = buildFormat(type);
+    const format = isTikTok
+        ? `bestvideo*[height<=${parseInt(type) || 1080}]+bestaudio/best[height<=${parseInt(type) || 1080}]/best`
+        : rawFormat;
+
+    const filename = `snapload_${Date.now()}.${ext}`;
 
     console.log(`[DOWNLOAD] type=${type} → ${safeUrl}`);
 
@@ -238,12 +270,19 @@ app.get('/api/download', rateLimit, async (req, res) => {
             } else {
                 // Separate video+audio (720p+) — merge via ffmpeg
                 console.log(`[DOWNLOAD] YT multi-stream → ffmpeg merge`);
-                spawnMergeStream(safeUrl, format, res, req);
+                spawnMergeStream(safeUrl, format, res, req, YT_ARGS);
             }
+        } else if (isTikTok) {
+            console.log(`[DOWNLOAD] TikTok → yt-dlp stream`);
+            spawnMergeStream(safeUrl, format, res, req, TIKTOK_ARGS);
+        } else if (isInstagram) {
+            console.log(`[DOWNLOAD] Instagram → yt-dlp stream`);
+            spawnMergeStream(safeUrl, format, res, req, INSTAGRAM_ARGS);
+        } else if (isTwitter) {
+            console.log(`[DOWNLOAD] Twitter/X → yt-dlp stream`);
+            spawnMergeStream(safeUrl, format, res, req, TWITTER_ARGS);
         } else {
-            // TikTok / Instagram / Twitter need session cookies →
-            // let yt-dlp handle auth + stream in one step
-            console.log(`[DOWNLOAD] social → yt-dlp stream`);
+            console.log(`[DOWNLOAD] generic → yt-dlp stream`);
             spawnMergeStream(safeUrl, format, res, req);
         }
 

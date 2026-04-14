@@ -4,7 +4,7 @@ class YouTubeProvider extends BaseProvider {
     async getInfo(url) {
         const output = await this.executeYtdlp(url, {
             // Stable client bypass for 403s and Bot Detection
-            extractorArgs: 'youtube:player_client=ios,android,web',
+            extractorArgs: 'youtube:player_client=tv_embedded,ios,mweb',
         });
 
         const formats = output.formats || [];
