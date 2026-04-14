@@ -29,7 +29,8 @@
         }
     </script>
     <style>
-        body { background-color: #0f0f0f; color: #fff; overflow-x: hidden; }
+        html, body { overflow-x: hidden; width: 100%; position: relative; }
+        body { background-color: #0f0f0f; color: #fff; }
 
         .glass-card {
             background: rgba(255,255,255,0.03);
@@ -121,10 +122,10 @@
                 Free &amp; Unlimited Video Downloads
             </div>
 
-            <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
+            <h1 class="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight mb-4 sm:mb-6 leading-tight">
                 Download Any Video,<br><span class="gradient-text">Instantly.</span>
             </h1>
-            <p class="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
+            <p class="text-base sm:text-lg md:text-xl text-gray-400 mb-8 sm:mb-10 max-w-2xl mx-auto px-2">
                 The fastest way to save high-quality videos from your favourite social platforms.
                 No watermarks, no sign-up required.
             </p>
@@ -481,6 +482,12 @@
         });
         document.querySelectorAll('.mobile-link').forEach(function (l) {
             l.addEventListener('click', function () { mobileMenu.classList.add('hidden'); });
+        });
+
+        window.addEventListener('scroll', function() {
+            if (!mobileMenu.classList.contains('hidden')) {
+                mobileMenu.classList.add('hidden');
+            }
         });
 
         // ── Platform Tab Data ────────────────────────────────────────────────
