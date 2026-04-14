@@ -3,8 +3,8 @@ const BaseProvider = require('./BaseProvider');
 class YouTubeProvider extends BaseProvider {
     async getInfo(url) {
         const output = await this.executeYtdlp(url, {
-            // android_vr client unlocks all resolutions including 4K
-            extractorArgs: 'youtube:player_client=android_vr,web',
+            // Stable client bypass for 403s and Bot Detection
+            extractorArgs: 'youtube:player_client=ios,android,web',
         });
 
         const formats = output.formats || [];

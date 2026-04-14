@@ -4,7 +4,6 @@ const { quoteArg } = require('../utils/shell');
 
 class BaseProvider {
     constructor() {
-        this.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
     }
 
     async getInfo(url) {
@@ -18,7 +17,6 @@ class BaseProvider {
             noCheckCertificate: true,
             noPlaylist:         true,
             ffmpegLocation:     ffmpegPath,
-            userAgent:          this.userAgent,
         };
 
         return await youtubedl(url, { ...defaultArgs, ...extraArgs }, { timeout: 45000 });

@@ -103,6 +103,7 @@ function getDirectUrls(safeUrl, format) {
         const args = [
             safeUrl, '-f', format,
             '--no-warnings', '--no-check-certificate', '--no-playlist',
+            '--extractor-args', 'youtube:player_client=ios,android,web',
             '--get-url',
         ];
         const proc  = spawn(YTDLP, args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -145,6 +146,7 @@ function spawnMergeStream(safeUrl, format, res, req) {
         safeUrl,
         '-f', format,
         '--no-warnings', '--no-check-certificate', '--no-playlist',
+        '--extractor-args', 'youtube:player_client=ios,android,web',
         '--ffmpeg-location', ffmpegPath,
         '-o', '-',
     ];
