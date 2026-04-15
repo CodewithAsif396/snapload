@@ -374,7 +374,21 @@ app.get('/api/download', rateLimit, async (req, res) => {
             // Step 0: TikTok /api/item/detail/ + tt_chain_token CDN cookie
             // tt_chain_token is TikTok's CDN pass — without it the CDN silently
             // serves the compressed stream. It arrives in Set-Cookie of the API response.
-            const videoId = safeUrl.match(/video\/(\d+)/)?.[1];
+
+            // Resolve short URLs (vt.tiktok.com, vm.tiktok.com) — extractVideoId fails without this
+            const resolvedTikTokUrl = await new Promise((resolve) => {
+                if (!safeUrl.includes('vt.tiktok.com') && !safeUrl.includes('vm.tiktok.com')) return resolve(safeUrl);
+                const r = https.get(safeUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res2) => {
+                    res2.resume();
+                    if ([301, 302, 307, 308].includes(res2.statusCode) && res2.headers.location) {
+                        const loc = res2.headers.location;
+                        resolve(loc.startsWith('http') ? loc : `https://www.tiktok.com${loc}`);
+                    } else { resolve(safeUrl); }
+                });
+                r.on('error', () => resolve(safeUrl));
+                setTimeout(() => { r.destroy(); resolve(safeUrl); }, 6000);
+            });
+            const videoId = resolvedTikTokUrl.match(/video\/(\d+)/)?.[1];
             if (videoId) {
                 const { item, ttToken } = await new Promise((resolve) => {
                     const qs = [

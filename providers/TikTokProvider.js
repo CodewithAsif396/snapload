@@ -6,6 +6,24 @@ function extractVideoId(url) {
     return m ? m[1] : null;
 }
 
+// Resolve vt.tiktok.com / vm.tiktok.com short URLs → full URL containing video ID
+function resolveTikTokUrl(url) {
+    if (!url.includes('vt.tiktok.com') && !url.includes('vm.tiktok.com')) return Promise.resolve(url);
+    return new Promise((resolve) => {
+        const req = https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+            res.resume();
+            if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
+                const loc = res.headers.location;
+                resolve(loc.startsWith('http') ? loc : `https://www.tiktok.com${loc}`);
+            } else {
+                resolve(url);
+            }
+        });
+        req.on('error', () => resolve(url));
+        setTimeout(() => { req.destroy(); resolve(url); }, 6000);
+    });
+}
+
 // ─── Method A: TikTok web item-detail API + tt_chain_token ───────────────────
 // /api/item/detail/ returns bitrateInfo with genuine HD URLs AND sets
 // tt_chain_token in Set-Cookie — that token is the CDN pass for original quality.
@@ -126,7 +144,9 @@ async function snaptikFetch(url) {
 // ─── Provider ─────────────────────────────────────────────────────────────────
 class TikTokProvider extends BaseProvider {
     async getInfo(url) {
-        const videoId = extractVideoId(url);
+        // Resolve short URLs (vt.tiktok.com, vm.tiktok.com) before extracting video ID
+        const resolvedUrl = await resolveTikTokUrl(url);
+        const videoId = extractVideoId(resolvedUrl);
 
         // A: item/detail API — bitrateInfo with HD URLs
         if (videoId) {
