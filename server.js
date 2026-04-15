@@ -298,7 +298,7 @@ const YT_ARGS = [
 const TIKTOK_ARGS = [
     '--add-header', 'referer:https://www.tiktok.com/',
     '--add-header', 'origin:https://www.tiktok.com',
-    '--add-header', 'user-agent:Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    '--add-header', 'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
     '--extractor-args', 'tiktok:api_hostname=api22-normal-c-useast2a.tiktokv.com;app_version=33.4.3;manifest_app_version=2023304030',
     '--no-check-formats',
     '--geo-bypass-country', 'US',
@@ -461,44 +461,12 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 }
             }
 
-            // Step 1: tikwm.com API → get CDN URL
-            const tikwmData = await new Promise((resolve) => {
-                const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(safeUrl)}&hd=1`;
-                https.get(apiUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r) => {
-                    let d = ''; r.on('data', c => d += c);
-                    r.on('end', () => { try { const j = JSON.parse(d); resolve(j?.code === 0 ? j.data : null); } catch { resolve(null); } });
-                }).on('error', () => resolve(null));
-            });
-
-            if (tikwmData) {
-                const cdnUrl = isAudio
-                    ? (tikwmData.music || tikwmData.hdplay)
-                    : (tikwmData.hdplay || tikwmData.play);
-
-                console.log(`[DOWNLOAD] TikTok tikwm: id=${tikwmData.id} hd_size=${tikwmData.hd_size} hdplay=${!!tikwmData.hdplay}`);
-
-                // Step 2: Try CDN URL (follows redirects, only pipes 200 OK)
-                if (cdnUrl) {
-                    const ok = await pipeCdnUrl(cdnUrl, res, req, {
-                        'Referer': 'https://www.tiktok.com/',
-                        'Origin':  'https://www.tiktok.com',
-                    });
-                    if (ok) return;
-                }
-
-                // Step 3: CDN URL blocked/expired → try tikwm's own download endpoint
-                if (!isAudio && tikwmData.id) {
-                    const directUrl = `https://www.tikwm.com/video/media/hdplay/${tikwmData.id}.mp4`;
-                    console.log(`[DOWNLOAD] TikTok → tikwm direct endpoint`);
-                    const ok2 = await pipeCdnUrl(directUrl, res, req, { 'Referer': 'https://www.tikwm.com/' });
-                    if (ok2) return;
-                }
-            }
-
-            // Step 4: Final fallback — yt-dlp with TikTok mobile UA
+            // Step 1: yt-dlp — gets original quality (htdefbr format, ~71MB)
+            // Must run BEFORE tikwm: tikwm pipes compressed 9MB and exits successfully,
+            // which would prevent yt-dlp from ever running.
             if (!res.headersSent) {
-                console.log(`[DOWNLOAD] TikTok → yt-dlp fallback`);
-                spawnMergeStream(safeUrl, 'bestvideo*+bestaudio/best', res, req, TIKTOK_ARGS);
+                console.log(`[DOWNLOAD] TikTok → yt-dlp (original quality)`);
+                spawnMergeStream(safeUrl, 'best', res, req, TIKTOK_ARGS);
             }
         } else if (isInstagram) {
             console.log(`[DOWNLOAD] Instagram → yt-dlp stream`);
