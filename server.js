@@ -371,7 +371,88 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 res.setHeader('Content-Disposition', `attachment; filename="doomsdaysnap_${Date.now()}.mp4"`);
             }
 
-            // Step 0: TikTok internal API — pick highest-quality URL from bit_rate array
+            // Step 0A: TikTok webpage scrape — bitrateInfo contains genuine HD CDN URLs
+            // TikTok server-renders __UNIVERSAL_DATA_FOR_REHYDRATION__ with full video data
+            const webItem = await new Promise((resolve) => {
+                const headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'identity',
+                    'Referer': 'https://www.tiktok.com/',
+                    'Cache-Control': 'max-age=0',
+                };
+                if (process.env.TIKTOK_COOKIE) headers['Cookie'] = process.env.TIKTOK_COOKIE;
+                const r = https.get(safeUrl, { headers }, (res2) => {
+                    const chunks = [];
+                    res2.on('data', c => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+                    res2.on('end', () => {
+                        try {
+                            const html = Buffer.concat(chunks).toString('utf8');
+                            const marker = '<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"';
+                            const si = html.indexOf(marker);
+                            if (si !== -1) {
+                                const ci = html.indexOf('>', si) + 1;
+                                const ce = html.indexOf('</script>', ci);
+                                if (ce !== -1) {
+                                    const data = JSON.parse(html.slice(ci, ce));
+                                    const item = data?.__DEFAULT_SCOPE__?.['webapp.video-detail']?.itemInfo?.itemStruct;
+                                    if (item?.video) return resolve(item);
+                                }
+                            }
+                            // Fallback: SIGI_STATE (older TikTok web)
+                            const sigiMarker = '<script id="SIGI_STATE"';
+                            const ssi = html.indexOf(sigiMarker);
+                            if (ssi !== -1) {
+                                const sci = html.indexOf('>', ssi) + 1;
+                                const sce = html.indexOf('</script>', sci);
+                                if (sce !== -1) {
+                                    const data = JSON.parse(html.slice(sci, sce));
+                                    const items = data?.ItemModule;
+                                    if (items) {
+                                        const first = Object.values(items)[0];
+                                        if (first?.video) return resolve(first);
+                                    }
+                                }
+                            }
+                            resolve(null);
+                        } catch { resolve(null); }
+                    });
+                });
+                r.on('error', () => resolve(null));
+                setTimeout(() => { r.destroy(); resolve(null); }, 12000);
+            });
+
+            if (webItem?.video) {
+                const video = webItem.video;
+                let cdnUrl = null;
+
+                if (isAudio) {
+                    cdnUrl = webItem.music?.playUrl;
+                } else {
+                    // Pick highest quality from bitrateInfo array
+                    if (Array.isArray(video.bitrateInfo) && video.bitrateInfo.length > 0) {
+                        const gearRes = (name = '') => { const m = name.match(/(\d{3,4})/); return m ? parseInt(m[1]) : 0; };
+                        const best = [...video.bitrateInfo].sort((a, b) => {
+                            const diff = gearRes(b.GearName) - gearRes(a.GearName);
+                            return diff !== 0 ? diff : (b.Bitrate || 0) - (a.Bitrate || 0);
+                        })[0];
+                        cdnUrl = best?.PlayAddr?.UrlList?.[0];
+                        console.log(`[DOWNLOAD] TikTok web scrape: gear=${best?.GearName} url=${!!cdnUrl}`);
+                    }
+                    // Fallback within web data: downloadAddr → playAddr
+                    if (!cdnUrl) cdnUrl = video.downloadAddr || video.playAddr;
+                }
+
+                if (cdnUrl) {
+                    const tiktokHeaders = { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.tiktok.com/' };
+                    if (process.env.TIKTOK_COOKIE) tiktokHeaders['Cookie'] = process.env.TIKTOK_COOKIE;
+                    const ok = await pipeCdnUrl(cdnUrl, res, req, tiktokHeaders);
+                    if (ok) return;
+                }
+            }
+
+            // Step 0B: TikTok internal aweme API — bit_rate array with gear_name quality tiers
             const videoId = safeUrl.match(/video\/(\d+)/)?.[1];
             if (videoId) {
                 const aweme = await new Promise((resolve) => {
@@ -394,7 +475,6 @@ app.get('/api/download', rateLimit, async (req, res) => {
                     if (isAudio) {
                         cdnUrl = aweme.music?.play_url?.url_list?.[0];
                     } else {
-                        // Sort bit_rate[] by resolution encoded in gear_name, pick highest
                         if (Array.isArray(video.bit_rate) && video.bit_rate.length > 0) {
                             const gearRes = (name = '') => { const m = name.match(/(\d{3,4})/); return m ? parseInt(m[1]) : 0; };
                             const best = [...video.bit_rate].sort((a, b) => {
@@ -404,7 +484,6 @@ app.get('/api/download', rateLimit, async (req, res) => {
                             cdnUrl = best?.play_addr?.url_list?.[0];
                             console.log(`[DOWNLOAD] TikTok internal API: gear=${best?.gear_name} url=${!!cdnUrl}`);
                         }
-                        // Fallback within internal API: download_addr → play_addr
                         if (!cdnUrl) cdnUrl = video.download_addr?.url_list?.[0] || video.play_addr?.url_list?.[0];
                     }
 
