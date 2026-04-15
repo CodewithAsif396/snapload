@@ -371,6 +371,52 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 res.setHeader('Content-Disposition', `attachment; filename="doomsdaysnap_${Date.now()}.mp4"`);
             }
 
+            // Step 0: TikTok internal API — pick highest-quality URL from bit_rate array
+            const videoId = safeUrl.match(/video\/(\d+)/)?.[1];
+            if (videoId) {
+                const aweme = await new Promise((resolve) => {
+                    const apiUrl = `https://api22-normal-c-useast2a.tiktokv.com/aweme/v1/feed/?aweme_id=${videoId}&aid=1233&app_name=musical_ly&version_code=26.1.3&device_type=Pixel+4&os=android`;
+                    const headers = { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.tiktok.com/' };
+                    if (process.env.TIKTOK_COOKIE) headers['Cookie'] = process.env.TIKTOK_COOKIE;
+                    https.get(apiUrl, { headers }, (r) => {
+                        let d = ''; r.on('data', c => d += c);
+                        r.on('end', () => {
+                            try { const j = JSON.parse(d); resolve(j?.status_code === 0 ? (j.aweme_list?.[0] || null) : null); }
+                            catch { resolve(null); }
+                        });
+                    }).on('error', () => resolve(null));
+                });
+
+                if (aweme?.video) {
+                    const video = aweme.video;
+                    let cdnUrl = null;
+
+                    if (isAudio) {
+                        cdnUrl = aweme.music?.play_url?.url_list?.[0];
+                    } else {
+                        // Sort bit_rate[] by resolution encoded in gear_name, pick highest
+                        if (Array.isArray(video.bit_rate) && video.bit_rate.length > 0) {
+                            const gearRes = (name = '') => { const m = name.match(/(\d{3,4})/); return m ? parseInt(m[1]) : 0; };
+                            const best = [...video.bit_rate].sort((a, b) => {
+                                const diff = gearRes(b.gear_name) - gearRes(a.gear_name);
+                                return diff !== 0 ? diff : (b.bit_rate || 0) - (a.bit_rate || 0);
+                            })[0];
+                            cdnUrl = best?.play_addr?.url_list?.[0];
+                            console.log(`[DOWNLOAD] TikTok internal API: gear=${best?.gear_name} url=${!!cdnUrl}`);
+                        }
+                        // Fallback within internal API: download_addr → play_addr
+                        if (!cdnUrl) cdnUrl = video.download_addr?.url_list?.[0] || video.play_addr?.url_list?.[0];
+                    }
+
+                    if (cdnUrl) {
+                        const tiktokHeaders = { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.tiktok.com/' };
+                        if (process.env.TIKTOK_COOKIE) tiktokHeaders['Cookie'] = process.env.TIKTOK_COOKIE;
+                        const ok = await pipeCdnUrl(cdnUrl, res, req, tiktokHeaders);
+                        if (ok) return;
+                    }
+                }
+            }
+
             // Step 1: tikwm.com API → get CDN URL
             const tikwmData = await new Promise((resolve) => {
                 const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(safeUrl)}&hd=1`;
