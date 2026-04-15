@@ -6,7 +6,7 @@ const http       = require('http');
 const { spawn }  = require('child_process');
 
 const { sanitizeUrl } = require('./utils/sanitizer');
-const { quoteArg }    = require('./utils/shell');
+
 const ffmpegPath      = require('ffmpeg-static');
 
 
@@ -155,37 +155,51 @@ function getDirectUrls(safeUrl, format) {
 }
 
 // ─── Pipe a single CDN URL directly to response ───────────────────────────────
-// This skips yt-dlp in the data path — client gets CDN speed directly.
-// Follows HTTP 301/302/307/308 redirects (TikTok CDN often redirects to actual file).
+// Returns Promise<true> on success, Promise<false> on failure (so caller can fallback).
+// Follows HTTP 301/302/307/308 redirects. Only pipes 200 OK — error responses are NOT piped.
 function pipeCdnUrl(cdnUrl, res, req, extraHeaders = {}, maxRedirects = 8) {
-    if (maxRedirects === 0) {
-        if (!res.headersSent) res.status(500).send('Download failed: too many redirects.');
-        return;
-    }
-    const lib     = cdnUrl.startsWith('https') ? https : http;
-    const reqOpts = {
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-            ...extraHeaders,
-        },
-    };
-    const cdnReq = lib.get(cdnUrl, reqOpts, (cdnRes) => {
-        // Follow redirects — TikTok CDN returns 302 to actual video
-        if ([301, 302, 307, 308].includes(cdnRes.statusCode) && cdnRes.headers.location) {
-            cdnRes.resume(); // discard redirect body
-            console.log(`[CDN Redirect] ${cdnRes.statusCode} → ${cdnRes.headers.location.slice(0, 80)}...`);
-            return pipeCdnUrl(cdnRes.headers.location, res, req, extraHeaders, maxRedirects - 1);
+    return new Promise((resolve) => {
+        if (maxRedirects === 0) {
+            console.error('[CDN] Too many redirects, giving up');
+            resolve(false);
+            return;
         }
-        // Forward content-length so browser shows download progress
-        const cl = cdnRes.headers['content-length'];
-        if (cl) res.setHeader('Content-Length', cl);
-        cdnRes.pipe(res);
+        const lib = cdnUrl.startsWith('https') ? https : http;
+        const cdnReq = lib.get(cdnUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+                'Accept':     '*/*',
+                ...extraHeaders,
+            },
+        }, (cdnRes) => {
+            // Follow redirects — TikTok CDN often 302s to actual file
+            if ([301, 302, 307, 308].includes(cdnRes.statusCode) && cdnRes.headers.location) {
+                cdnRes.resume();
+                const loc     = cdnRes.headers.location;
+                const nextUrl = loc.startsWith('http') ? loc : new URL(loc, cdnUrl).href;
+                console.log(`[CDN Redirect] ${cdnRes.statusCode} → ${nextUrl.slice(0, 80)}`);
+                pipeCdnUrl(nextUrl, res, req, extraHeaders, maxRedirects - 1).then(resolve);
+                return;
+            }
+            // Only stream 200 OK — don't pipe error pages (403/429/404 HTML = tiny "file")
+            if (cdnRes.statusCode !== 200) {
+                cdnRes.resume();
+                console.error(`[CDN] Status ${cdnRes.statusCode} — will try fallback`);
+                resolve(false);
+                return;
+            }
+            const cl = cdnRes.headers['content-length'];
+            if (cl) res.setHeader('Content-Length', cl);
+            cdnRes.pipe(res);
+            cdnRes.on('end',   () => resolve(true));
+            cdnRes.on('error', () => resolve(false));
+        });
+        cdnReq.on('error', (err) => {
+            console.error('[CDN Pipe Error]:', err.message);
+            resolve(false);
+        });
+        req.on('close', () => cdnReq.destroy());
     });
-    cdnReq.on('error', (err) => {
-        console.error('[CDN Pipe Error]:', err.message);
-        if (!res.headersSent) res.status(500).send('Download failed.');
-    });
-    req.on('close', () => cdnReq.destroy());
 }
 
 // ─── Merge video+audio via yt-dlp+ffmpeg streaming ───────────────────────────
@@ -194,7 +208,7 @@ function spawnMergeStream(safeUrl, format, res, req, extraArgs = []) {
         safeUrl,
         '-f', format,
         '--no-warnings', '--no-check-certificate', '--no-playlist',
-        '--ffmpeg-location', quoteArg(ffmpegPath),
+        '--ffmpeg-location', ffmpegPath,
         ...COOKIES_ARGS,
         ...extraArgs,
         '-o', '-',
@@ -296,7 +310,6 @@ const INSTAGRAM_ARGS = [
 const TWITTER_ARGS = [
     '--add-header', 'referer:https://x.com/',
     '--add-header', 'origin:https://x.com',
-    '--extractor-args', 'twitter:api=syndication',
     '--merge-output-format', 'mp4',
 ];
 
@@ -347,7 +360,18 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 spawnMergeStream(safeUrl, format, res, req, YT_ARGS);
             }
         } else if (isTikTok) {
-            // Use tikwm.com API — works on datacenter IPs, removes watermark
+            const isAudio = type === 'audio';
+
+            // Override headers for TikTok before any pipe
+            if (isAudio) {
+                res.setHeader('Content-Type', 'audio/mpeg');
+                res.setHeader('Content-Disposition', `attachment; filename="doomsdaysnap_${Date.now()}.mp3"`);
+            } else {
+                res.setHeader('Content-Type', 'video/mp4');
+                res.setHeader('Content-Disposition', `attachment; filename="doomsdaysnap_${Date.now()}.mp4"`);
+            }
+
+            // Step 1: tikwm.com API → get CDN URL
             const tikwmData = await new Promise((resolve) => {
                 const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(safeUrl)}&hd=1`;
                 https.get(apiUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r) => {
@@ -357,34 +381,42 @@ app.get('/api/download', rateLimit, async (req, res) => {
             });
 
             if (tikwmData) {
-                console.log(`[DOWNLOAD] TikTok tikwm fields: hdplay=${!!tikwmData.hdplay} play=${!!tikwmData.play} music=${!!tikwmData.music}`);
-                let cdnUrl;
-                if (type === 'audio') {
-                    cdnUrl = tikwmData.music || tikwmData.hdplay || tikwmData.play;
-                    res.setHeader('Content-Type', 'audio/mpeg');
-                    res.setHeader('Content-Disposition', `attachment; filename="doomsdaysnap_${Date.now()}.mp3"`);
-                } else {
-                    // Always prefer hdplay (HD no-watermark), fallback to play
-                    cdnUrl = tikwmData.hdplay || tikwmData.play;
-                    res.setHeader('Content-Type', 'video/mp4');
-                    res.setHeader('Content-Disposition', `attachment; filename="doomsdaysnap_${Date.now()}.mp4"`);
-                }
+                const cdnUrl = isAudio
+                    ? (tikwmData.music || tikwmData.hdplay)
+                    : (tikwmData.hdplay || tikwmData.play);
+
+                console.log(`[DOWNLOAD] TikTok tikwm: id=${tikwmData.id} hd_size=${tikwmData.hd_size} hdplay=${!!tikwmData.hdplay}`);
+
+                // Step 2: Try CDN URL (follows redirects, only pipes 200 OK)
                 if (cdnUrl) {
-                    console.log(`[DOWNLOAD] TikTok → tikwm CDN (${type})`);
-                    return pipeCdnUrl(cdnUrl, res, req, {
+                    const ok = await pipeCdnUrl(cdnUrl, res, req, {
                         'Referer': 'https://www.tiktok.com/',
+                        'Origin':  'https://www.tiktok.com',
                     });
+                    if (ok) return;
+                }
+
+                // Step 3: CDN URL blocked/expired → try tikwm's own download endpoint
+                if (!isAudio && tikwmData.id) {
+                    const directUrl = `https://www.tikwm.com/video/media/hdplay/${tikwmData.id}.mp4`;
+                    console.log(`[DOWNLOAD] TikTok → tikwm direct endpoint`);
+                    const ok2 = await pipeCdnUrl(directUrl, res, req, { 'Referer': 'https://www.tikwm.com/' });
+                    if (ok2) return;
                 }
             }
-            // Fallback to yt-dlp
-            console.log(`[DOWNLOAD] TikTok → yt-dlp fallback`);
-            spawnMergeStream(safeUrl, format, res, req, TIKTOK_ARGS);
+
+            // Step 4: Final fallback — yt-dlp with TikTok mobile UA
+            if (!res.headersSent) {
+                console.log(`[DOWNLOAD] TikTok → yt-dlp fallback`);
+                spawnMergeStream(safeUrl, 'bestvideo*+bestaudio/best', res, req, TIKTOK_ARGS);
+            }
         } else if (isInstagram) {
             console.log(`[DOWNLOAD] Instagram → yt-dlp stream`);
             spawnMergeStream(safeUrl, format, res, req, INSTAGRAM_ARGS);
         } else if (isTwitter) {
             console.log(`[DOWNLOAD] Twitter/X → yt-dlp stream`);
-            const twitterFormat = 'bestvideo+bestaudio/best';
+            // 'best' picks the muxed stream (video+audio combined) — avoids merge failures
+            const twitterFormat = 'best[ext=mp4]/best/bestvideo+bestaudio';
             spawnMergeStream(safeUrl, twitterFormat, res, req, TWITTER_ARGS);
         } else {
             console.log(`[DOWNLOAD] generic → yt-dlp stream`);
