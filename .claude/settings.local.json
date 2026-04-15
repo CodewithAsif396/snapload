@@ -47,7 +47,17 @@
       "Bash(powershell -Command '\\(Get-NetTCPConnection -LocalPort 4000 -ErrorAction SilentlyContinue\\).OwningProcess | Where-Object {$_ -match '\\\\''^\\\\d+$'\\\\''} | Sort-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -EA SilentlyContinue }')",
       "Bash(powershell -Command '\\(Get-NetTCPConnection -LocalPort 4000 -EA SilentlyContinue\\).OwningProcess | Where-Object {$_ -match '\\\\''^\\\\d+$'\\\\''} | Sort-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -EA SilentlyContinue }')",
       "Bash(powershell -Command '\\(Get-NetTCPConnection -LocalPort 3000,4000 -EA SilentlyContinue\\).OwningProcess | Where-Object {$_ -match '\\\\''^\\\\d+$'\\\\''} | Sort-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -EA SilentlyContinue }')",
-      "Bash(node seed-demo-ads.js)"
+      "Bash(node seed-demo-ads.js)",
+      "WebFetch(domain:rapidapi.com)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:tikapi.io)",
+      "WebFetch(domain:usemyapi.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(node --check server.js)",
+      "Bash(node --check providers/TikTokProvider.js)"
     ]
   }
 }

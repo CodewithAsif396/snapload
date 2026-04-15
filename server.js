@@ -378,7 +378,43 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 res.setHeader('Content-Disposition', `attachment; filename="doomsdaysnap_${Date.now()}.mp4"`);
             }
 
-            // Step 0: TikTok /api/item/detail/ + tt_chain_token CDN cookie
+            // Step 0: tikwm RapidAPI — returns original quality hdplay URL (~71MB)
+            // Requires RAPIDAPI_KEY env var. Free tier: 500 req/month on rapidapi.com
+            if (process.env.RAPIDAPI_KEY) {
+                const rapidData = await new Promise((resolve) => {
+                    const apiUrl = `https://tiktok-scraper7.p.rapidapi.com/video/data?url=${encodeURIComponent(safeUrl)}&hd=1`;
+                    const r = https.get(apiUrl, {
+                        headers: {
+                            'X-RapidAPI-Key':  process.env.RAPIDAPI_KEY,
+                            'X-RapidAPI-Host': 'tiktok-scraper7.p.rapidapi.com',
+                        },
+                    }, (resp) => {
+                        let d = ''; resp.on('data', c => d += c);
+                        resp.on('end', () => {
+                            try { const j = JSON.parse(d); resolve(j?.code === 0 ? j.data : null); }
+                            catch { resolve(null); }
+                        });
+                    });
+                    r.on('error', () => resolve(null));
+                    setTimeout(() => { r.destroy(); resolve(null); }, 10000);
+                });
+
+                if (rapidData) {
+                    const cdnUrl = isAudio
+                        ? (rapidData.music || rapidData.hdplay)
+                        : (rapidData.hdplay || rapidData.play);
+                    console.log(`[DOWNLOAD] TikTok RapidAPI: hd_size=${rapidData.hd_size} url=${!!cdnUrl}`);
+                    if (cdnUrl) {
+                        const ok = await pipeCdnUrl(cdnUrl, res, req, {
+                            'User-Agent': 'Mozilla/5.0',
+                            'Referer':    'https://www.tiktok.com/',
+                        });
+                        if (ok) return;
+                    }
+                }
+            }
+
+            // Step 1: TikTok /api/item/detail/ + tt_chain_token CDN cookie
             // tt_chain_token is TikTok's CDN pass — without it the CDN silently
             // serves the compressed stream. It arrives in Set-Cookie of the API response.
 
@@ -468,14 +504,83 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 }
             }
 
-            // Step 1: yt-dlp with TikTok-specific cookies (cookiess.txt)
+            // Step 2: Direct page scraping — Tikorgzo-style __UNIVERSAL_DATA_FOR_REHYDRATION__
+            // Fetches the TikTok video page HTML and parses the embedded SSR JSON to get
+            // original-quality downloadAddr/playAddr directly from TikTok CDN.
+            if (!res.headersSent && videoId) {
+                const pageItem = await new Promise((resolve) => {
+                    const pageUrl = `https://www.tiktok.com/video/${videoId}`;
+                    const reqHeaders = {
+                        'User-Agent':      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                        'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept-Encoding': 'gzip, deflate, br',
+                        'Referer':         'https://www.tiktok.com/',
+                        'Sec-Fetch-Dest':  'document',
+                        'Sec-Fetch-Mode':  'navigate',
+                        'Sec-Fetch-Site':  'none',
+                    };
+                    if (process.env.TIKTOK_COOKIE) reqHeaders['Cookie'] = process.env.TIKTOK_COOKIE;
+                    const r = https.get(pageUrl, { headers: reqHeaders }, (resp) => {
+                        const zlib = require('zlib');
+                        let stream = resp;
+                        const enc = resp.headers['content-encoding'];
+                        if (enc === 'gzip')    stream = resp.pipe(zlib.createGunzip());
+                        else if (enc === 'br') stream = resp.pipe(zlib.createBrotliDecompress());
+                        else if (enc === 'deflate') stream = resp.pipe(zlib.createInflate());
+                        const chunks = [];
+                        stream.on('data', c => chunks.push(c));
+                        stream.on('end', () => {
+                            const html = Buffer.concat(chunks).toString('utf8');
+                            const m = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/);
+                            if (!m) return resolve(null);
+                            try {
+                                const d2 = JSON.parse(m[1]);
+                                resolve(d2?.['__DEFAULT_SCOPE__']?.['webapp.video-detail']?.itemInfo?.itemStruct || null);
+                            } catch { resolve(null); }
+                        });
+                        stream.on('error', () => resolve(null));
+                    });
+                    r.on('error', () => resolve(null));
+                    setTimeout(() => { r.destroy(); resolve(null); }, 15000);
+                });
+
+                if (pageItem?.video) {
+                    const video = pageItem.video;
+                    let cdnUrl = null;
+                    if (isAudio) {
+                        cdnUrl = pageItem.music?.playUrl;
+                    } else {
+                        const best = (() => {
+                            if (!Array.isArray(video.bitrateInfo) || !video.bitrateInfo.length) return null;
+                            const gearRes = (n = '') => { const m = n.match(/(\d{3,4})/); return m ? parseInt(m[1]) : 0; };
+                            return [...video.bitrateInfo].sort((a, b) => {
+                                const d = gearRes(b.GearName) - gearRes(a.GearName);
+                                return d !== 0 ? d : (b.Bitrate || 0) - (a.Bitrate || 0);
+                            })[0];
+                        })();
+                        cdnUrl = best?.PlayAddr?.UrlList?.[0] || video.downloadAddr || video.playAddr;
+                        console.log(`[DOWNLOAD] TikTok direct-page: gear=${best?.GearName || 'n/a'} url=${!!cdnUrl}`);
+                    }
+                    if (cdnUrl) {
+                        const dlHeaders = { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.tiktok.com/' };
+                        if (process.env.TIKTOK_COOKIE) dlHeaders['Cookie'] = process.env.TIKTOK_COOKIE;
+                        const ok = await pipeCdnUrl(cdnUrl, res, req, dlHeaders);
+                        if (ok) return;
+                    }
+                }
+            }
+
+            // Step 3: yt-dlp with TikTok-specific cookies (cookiess.txt)
             // With valid TikTok session cookie → htdefbr format (~71MB original quality)
             // Without cookie (datacenter IP)  → bytevc1_1080p (~9MB, best available)
             if (!res.headersSent) {
                 console.log(`[DOWNLOAD] TikTok → yt-dlp tiktok-cookies=${TIKTOK_COOKIES_ARGS.length > 0}`);
+                // bytevc1_1080p (h265, 9.35MB) > h264_540p (h264, 9.98MB despite larger size)
+                // height>=1920 targets portrait 1080x1920, width>=1080 as fallback
                 spawnMergeStream(
                     safeUrl,
-                    'best[height>=1920]/best[height>=1280]/best[height>=1024]/best',
+                    'bestvideo[height>=1920]/bestvideo[width>=1080]/bestvideo/best',
                     res, req,
                     TIKTOK_ARGS,
                     TIKTOK_COOKIES_ARGS

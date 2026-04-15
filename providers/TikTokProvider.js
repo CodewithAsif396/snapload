@@ -1,5 +1,6 @@
 const BaseProvider = require('./BaseProvider');
 const https        = require('https');
+const zlib         = require('zlib');
 
 function extractVideoId(url) {
     const m = url.match(/video\/(\d+)/);
@@ -141,6 +142,53 @@ async function snaptikFetch(url) {
     return null;
 }
 
+// ─── Method D: Direct page scraping (__UNIVERSAL_DATA_FOR_REHYDRATION__) ─────
+// Inspired by Tikorgzo's direct extractor: fetches the TikTok video page HTML,
+// parses the embedded SSR JSON to extract original-quality download URLs without
+// relying on any third-party API.
+function tiktokDirectPageFetch(videoId) {
+    return new Promise((resolve) => {
+        const url = `https://www.tiktok.com/video/${videoId}`;
+        const headers = {
+            'User-Agent':      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Referer':         'https://www.tiktok.com/',
+            'Sec-Fetch-Dest':  'document',
+            'Sec-Fetch-Mode':  'navigate',
+            'Sec-Fetch-Site':  'none',
+        };
+        if (process.env.TIKTOK_COOKIE) headers['Cookie'] = process.env.TIKTOK_COOKIE;
+
+        const req = https.get(url, { headers }, (res) => {
+            // Decompress response (TikTok almost always sends gzip/br)
+            let stream = res;
+            const enc = res.headers['content-encoding'];
+            if (enc === 'gzip')    stream = res.pipe(zlib.createGunzip());
+            else if (enc === 'br') stream = res.pipe(zlib.createBrotliDecompress());
+            else if (enc === 'deflate') stream = res.pipe(zlib.createInflate());
+
+            const chunks = [];
+            stream.on('data', c => chunks.push(c));
+            stream.on('end', () => {
+                const html = Buffer.concat(chunks).toString('utf8');
+                // Locate the SSR hydration data script tag
+                const m = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/);
+                if (!m) return resolve(null);
+                try {
+                    const data     = JSON.parse(m[1]);
+                    const item     = data?.['__DEFAULT_SCOPE__']?.['webapp.video-detail']?.itemInfo?.itemStruct;
+                    resolve(item || null);
+                } catch { resolve(null); }
+            });
+            stream.on('error', () => resolve(null));
+        });
+        req.on('error', () => resolve(null));
+        setTimeout(() => { req.destroy(); resolve(null); }, 15000);
+    });
+}
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 class TikTokProvider extends BaseProvider {
     async getInfo(url) {
@@ -223,7 +271,40 @@ class TikTokProvider extends BaseProvider {
             }
         }
 
-        // C: tikwm.com API
+        // C: Direct TikTok page scraping (__UNIVERSAL_DATA_FOR_REHYDRATION__)
+        // Tikorgzo-style: parses the SSR JSON embedded in the TikTok video page
+        // to get original downloadAddr/playAddr without any external API dependency.
+        if (videoId) {
+            const item = await tiktokDirectPageFetch(videoId);
+            if (item?.video) {
+                const video = item.video;
+                const w = video.width  || 576;
+                const h = video.height || 1024;
+                const res = `${w}×${h}`;
+                const formats = [];
+
+                const best = pickBestBitrateInfo(video.bitrateInfo);
+                if (best) {
+                    const bh = parseInt(best.GearName?.match(/(\d{3,4})/)?.[1]) || h;
+                    formats.push({ height: bh, ext: 'mp4', size: best.PlayAddr?.DataSize || null, label: `${best.GearName} · ${res}` });
+                } else if (video.downloadAddr || video.playAddr) {
+                    formats.push({ height: h, ext: 'mp4', size: null, label: `Original · ${res}` });
+                }
+
+                if (formats.length > 0) {
+                    const dur = video.duration || 0;
+                    return {
+                        title:     item.desc  || 'TikTok Video',
+                        thumbnail: video.cover || '',
+                        duration:  `${String(Math.floor(dur / 60))}:${String(dur % 60).padStart(2, '0')}`,
+                        formats,
+                        provider:  'tiktok',
+                    };
+                }
+            }
+        }
+
+        // D: tikwm.com API
         const data = await tikwmFetch(url) || await snaptikFetch(url);
         if (data) {
             const w = data.width  || 1080;
@@ -243,7 +324,7 @@ class TikTokProvider extends BaseProvider {
             };
         }
 
-        // D: yt-dlp final fallback
+        // E: yt-dlp final fallback
         console.log('[TikTok] All APIs failed, trying yt-dlp');
         const output = await this.executeYtdlp(url, {
             addHeader: [
