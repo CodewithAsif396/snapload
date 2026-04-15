@@ -336,7 +336,30 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 spawnMergeStream(safeUrl, format, res, req, YT_ARGS);
             }
         } else if (isTikTok) {
-            console.log(`[DOWNLOAD] TikTok → yt-dlp stream`);
+            // Use tikwm.com API — works on datacenter IPs, removes watermark
+            const tikwmData = await new Promise((resolve) => {
+                const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(safeUrl)}&hd=1`;
+                https.get(apiUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r) => {
+                    let d = ''; r.on('data', c => d += c);
+                    r.on('end', () => { try { const j = JSON.parse(d); resolve(j?.code === 0 ? j.data : null); } catch { resolve(null); } });
+                }).on('error', () => resolve(null));
+            });
+
+            if (tikwmData) {
+                const cdnUrl = type === 'audio'
+                    ? (tikwmData.music || tikwmData.hdplay || tikwmData.play)
+                    : (tikwmData.hdplay || tikwmData.play);
+                if (cdnUrl) {
+                    console.log(`[DOWNLOAD] TikTok → tikwm CDN`);
+                    if (type === 'audio') {
+                        res.setHeader('Content-Type', 'audio/mpeg');
+                        res.setHeader('Content-Disposition', `attachment; filename="doomsdaysnap_${Date.now()}.mp3"`);
+                    }
+                    return pipeCdnUrl(cdnUrl, res, req);
+                }
+            }
+            // Fallback to yt-dlp
+            console.log(`[DOWNLOAD] TikTok → yt-dlp fallback`);
             spawnMergeStream(safeUrl, format, res, req, TIKTOK_ARGS);
         } else if (isInstagram) {
             console.log(`[DOWNLOAD] Instagram → yt-dlp stream`);
