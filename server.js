@@ -156,15 +156,26 @@ function getDirectUrls(safeUrl, format) {
 
 // ─── Pipe a single CDN URL directly to response ───────────────────────────────
 // This skips yt-dlp in the data path — client gets CDN speed directly.
-function pipeCdnUrl(cdnUrl, res, req, extraHeaders = {}) {
+// Follows HTTP 301/302/307/308 redirects (TikTok CDN often redirects to actual file).
+function pipeCdnUrl(cdnUrl, res, req, extraHeaders = {}, maxRedirects = 8) {
+    if (maxRedirects === 0) {
+        if (!res.headersSent) res.status(500).send('Download failed: too many redirects.');
+        return;
+    }
     const lib     = cdnUrl.startsWith('https') ? https : http;
     const reqOpts = {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
             ...extraHeaders,
         },
     };
     const cdnReq = lib.get(cdnUrl, reqOpts, (cdnRes) => {
+        // Follow redirects — TikTok CDN returns 302 to actual video
+        if ([301, 302, 307, 308].includes(cdnRes.statusCode) && cdnRes.headers.location) {
+            cdnRes.resume(); // discard redirect body
+            console.log(`[CDN Redirect] ${cdnRes.statusCode} → ${cdnRes.headers.location.slice(0, 80)}...`);
+            return pipeCdnUrl(cdnRes.headers.location, res, req, extraHeaders, maxRedirects - 1);
+        }
         // Forward content-length so browser shows download progress
         const cl = cdnRes.headers['content-length'];
         if (cl) res.setHeader('Content-Length', cl);
