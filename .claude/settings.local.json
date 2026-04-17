@@ -64,7 +64,10 @@
       "Bash(node --check providers/TwitterProvider.js)",
       "Bash(node --check providers/FacebookProvider.js)",
       "Bash(node --check providers/BaseProvider.js)",
-      "Bash(node --check d:/doomsdaysnap/server.js)"
+      "Bash(node --check d:/doomsdaysnap/server.js)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
