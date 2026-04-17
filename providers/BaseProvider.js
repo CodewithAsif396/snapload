@@ -28,13 +28,20 @@ function getYTdlpPath() {
 
 const YTDLP_BIN = getYTdlpPath();
 
-// Cookies file detection
-const COOKIES_FILE = path.join(__dirname, '..', 'cookies.txt');
-const COOKIES_ARG  = fs.existsSync(COOKIES_FILE) ? COOKIES_FILE : null;
+// Cookies file detection — check multiple possible names (browser export adds " (1)" suffix)
+function findCookiesFile() {
+    const names = ['cookies.txt', 'cookies (1).txt', 'cookie.txt'];
+    for (const name of names) {
+        const p = path.join(__dirname, '..', name);
+        if (fs.existsSync(p)) return p;
+    }
+    return null;
+}
+const COOKIES_ARG = findCookiesFile();
 
 console.log('[BaseProvider] Using YTDLP:', YTDLP_BIN);
 if (COOKIES_ARG) console.log('[BaseProvider] Using COOKIES_FILE:', COOKIES_ARG);
-else            console.log('[BaseProvider] cookies.txt NOT found');
+else            console.log('[BaseProvider] No cookies file found');
 
 
 // Convert options object → CLI args array

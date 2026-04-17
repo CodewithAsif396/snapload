@@ -9,9 +9,9 @@ const { spawn }  = require('child_process');
 const { sanitizeUrl }    = require('./utils/sanitizer');
 const { getTikTokCdnUrl } = require('./utils/tiktokBrowser');
 const { getRandomUA }     = require('./utils/userAgent');
+const { cobaltExtract }   = require('./utils/cobalt');
 
 const ffmpegPath = require('ffmpeg-static');
-const browserScraper = require('./utils/browserScraper');
 
 
 // ── Provider imports — one file per platform ──────────────────────────────────
@@ -1001,53 +1001,35 @@ app.get('/api/download', rateLimit, async (req, res) => {
             });
 
         } else if (isFacebook || isSnapchat || isPinterest) {
-            const uaData = getRandomUA();
-            const referer = isFacebook ? 'https://www.facebook.com/' : (isSnapchat ? 'https://www.snapchat.com/' : 'https://www.pinterest.com/');
-            
+            const uaData  = getRandomUA();
+            const referer = isFacebook  ? 'https://www.facebook.com/'
+                          : isSnapchat  ? 'https://www.snapchat.com/'
+                          : 'https://www.pinterest.com/';
+
             const extraArgs = [
                 '--user-agent', uaData.ua,
                 '--referer', referer,
-                '--add-header', `sec-ch-ua: ${uaData.clientHints}`,
-                '--add-header', `sec-ch-ua-mobile: ${uaData.mobile || '?0'}`,
-                '--add-header', `sec-ch-ua-platform: ${uaData.platform}`,
-                '--add-header', 'sec-fetch-dest: empty',
-                '--add-header', 'sec-fetch-mode: cors',
-                '--add-header', 'sec-fetch-site: same-origin',
-                '--add-header', `origin: ${referer}`,
-                '--merge-output-format', 'mp4'
+                '--merge-output-format', 'mp4',
             ];
+            if (COOKIES_FILE) extraArgs.push('--cookies', COOKIES_FILE);
 
-            // Add cookies if available
-            if (fs.existsSync(COOKIES_FILE)) {
-                extraArgs.push('--cookies', COOKIES_FILE);
+            const cdnHeaders = { 'User-Agent': uaData.ua, 'Referer': referer };
+
+            // ── Pinterest: cobalt.tools API first (free, reliable) ────────────
+            if (isPinterest) {
+                console.log('[DOWNLOAD] Pinterest → cobalt.tools API');
+                const cobalt = await cobaltExtract(safeUrl).catch(() => null);
+                if (cobalt?.url) {
+                    const ok = await pipeCdnUrl(cobalt.url, res, req, cdnHeaders);
+                    if (ok) return;
+                }
+                console.log('[DOWNLOAD] Pinterest cobalt failed → yt-dlp fallback');
+                await tryDirectThenMerge(safeUrl, format, res, req, extraArgs, cdnHeaders);
+                return;
             }
 
-            const cdnHeaders = {
-                'User-Agent': uaData.ua,
-                'Referer': referer,
-                'Sec-CH-UA': uaData.clientHints,
-                'Sec-CH-UA-Mobile': uaData.mobile || '?0',
-                'Sec-CH-UA-Platform': uaData.platform
-            };
-
-            // Try browser-based resolution first (most reliable for FB/Pin/Snap)
-            console.log(`[DOWNLOAD] ${isFacebook ? 'FB' : (isSnapchat ? 'Snap' : 'Pin')} → browser-based resolution`);
-            const browserResult = isFacebook ? await browserScraper.extractFacebook(safeUrl)
-                                : (isSnapchat ? await browserScraper.extractSnapchat(safeUrl)
-                                : await browserScraper.extractPinterest(safeUrl));
-
-            if (browserResult && browserResult.formats.length > 0) {
-                // Find matching quality or best available
-                const target = browserResult.formats.find(f => f.height === type) || browserResult.formats[0];
-                console.log(`[DOWNLOAD] result found via browser: ${target.url.slice(0, 60)}`);
-                const ok = await pipeCdnUrl(target.url, res, req, {
-                    'User-Agent': uaData.ua,
-                    'Referer': referer
-                });
-                if (ok) return;
-            }
-
-            console.log('[DOWNLOAD] Browser resolution failed/skipped, falling back to yt-dlp...');
+            // ── Facebook / Snapchat: yt-dlp with cookies ──────────────────────
+            console.log(`[DOWNLOAD] ${isFacebook ? 'Facebook' : 'Snapchat'} → yt-dlp with cookies`);
             await tryDirectThenMerge(safeUrl, format, res, req, extraArgs, cdnHeaders);
 
         } else {

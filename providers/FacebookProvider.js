@@ -1,39 +1,27 @@
 const BaseProvider = require('./BaseProvider');
-const browserScraper = require('../utils/browserScraper');
 
 class FacebookProvider extends BaseProvider {
     async getInfo(url) {
-        console.log('[Facebook] Attempting high-quality browser extraction...');
-        const result = await browserScraper.extractFacebook(url);
+        console.log('[Facebook] yt-dlp with cookies...');
 
-        if (result) {
+        // Normalize URL — prefer www over m. for better yt-dlp compat
+        const cleanUrl = url.replace('m.facebook.com', 'www.facebook.com');
+
+        try {
+            const output = await this.executeYtdlp(cleanUrl, {
+                referer: 'https://www.facebook.com/',
+            });
+
             return {
-                title:     result.title,
-                thumbnail: result.thumbnail,
-                duration:  '0:00',
-                formats:   result.formats.map(f => ({
-                    height: f.height,
-                    ext:    f.ext,
-                    url:    f.url, // Note: We return direct URL for browser extraction
-                    size:   null,
-                })),
+                title:     output.title           || 'Facebook Video',
+                thumbnail: output.thumbnail       || '',
+                duration:  output.duration_string || '0:00',
+                formats:   this.parseFormats(output.formats),
                 provider:  'facebook',
             };
+        } catch (err) {
+            throw new Error('Facebook video could not be fetched. Only public videos are supported. ' + err.message);
         }
-
-        // Fallback to BaseProvider (yt-dlp) if browser fails
-        console.log('[Facebook] Browser extraction failed, falling back to yt-dlp...');
-        const output = await this.executeYtdlp(url, {
-            referer: 'https://www.facebook.com/',
-        });
-
-        return {
-            title:     output.title           || 'Facebook Video',
-            thumbnail: output.thumbnail       || '',
-            duration:  output.duration_string || '0:00',
-            formats:   this.parseFormats(output.formats),
-            provider:  'facebook',
-        };
     }
 }
 
