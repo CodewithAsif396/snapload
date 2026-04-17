@@ -76,6 +76,21 @@
         }
         .shake { animation: shake 0.4s ease-in-out; }
 
+        /* Mobile format rows */
+        @media (max-width: 480px) {
+            /* Platform tabs — show text on all sizes */
+            .platform-tab span { display: inline !important; font-size: 0.7rem; }
+            .platform-tab { gap: 4px; padding: 10px 4px; }
+            .platform-tab i { font-size: 1rem; }
+
+            /* Format download rows */
+            #res-formats .flex { flex-wrap: wrap; gap: 12px; }
+            #res-formats .flex > div:first-child { flex: 1; min-width: 0; }
+
+            /* Result card */
+            #result-area .flex.flex-col.md\\:flex-row { gap: 16px; }
+        }
+
         /* toast slide */
         @keyframes slideIn  { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(110%); opacity: 0; } }
@@ -223,7 +238,7 @@
                     <input
                         type="text"
                         id="video-url"
-                        class="flex-grow bg-transparent border-none text-white px-2 py-3.5 focus:outline-none placeholder-gray-600 w-full text-base"
+                        class="flex-grow bg-transparent border-none text-white px-2 py-3.5 focus:outline-none placeholder-gray-400 w-full text-base"
                         placeholder="Paste your YouTube link here..."
                         autocomplete="off"
                         spellcheck="false"
@@ -735,8 +750,11 @@
 
         // ── Paste from Clipboard ─────────────────────────────────────────────
         function pasteFromClipboard() {
-            if (!navigator.clipboard) {
-                showToast('Clipboard not supported — please paste manually (Ctrl+V)', 'warning');
+            // On mobile, clipboard API triggers a permission popup — just focus input instead
+            var isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+            if (isMobile || !navigator.clipboard || !navigator.clipboard.readText) {
+                urlInput.focus();
+                showToast('Input pe tap karo aur paste karo', 'info', 3000);
                 return;
             }
             navigator.clipboard.readText().then(function (text) {
@@ -745,10 +763,12 @@
                     urlInput.dispatchEvent(new Event('input'));
                     showToast('Link pasted!', 'success', 2000);
                 } else {
-                    showToast('Clipboard is empty', 'warning', 2000);
+                    urlInput.focus();
+                    showToast('Clipboard empty — manually paste (Ctrl+V)', 'warning', 2500);
                 }
             }).catch(function () {
-                showToast('Clipboard access denied — please paste manually (Ctrl+V)', 'warning');
+                urlInput.focus();
+                showToast('Paste manually — Ctrl+V or long-press', 'info', 2500);
             });
         }
 
@@ -847,7 +867,7 @@
                 + '<a href="' + dlUrl + '" target="_blank" download'
                 + ' class="gradient-bg text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg hover:shadow-purple-500/20 active:scale-95 transition-all flex-shrink-0"'
                 + ' onclick="showToast(\'Download started!\',\'success\',2500)">'
-                + '<i class="fa-solid fa-arrow-down-long"></i><span class="hidden xs:inline">Download</span>'
+                + '<i class="fa-solid fa-arrow-down-long"></i><span>Download</span>'
                 + '</a>'
                 + '</div>';
         }
