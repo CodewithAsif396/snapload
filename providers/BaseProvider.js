@@ -61,6 +61,55 @@ class BaseProvider {
         throw new Error('getInfo must be implemented by subclass');
     }
 
+    /**
+     * Shared format parser used by all social providers.
+     * - Filters out audio-only streams
+     * - Prefers H.264 (avc/h264) for maximum device compatibility
+     * - Deduplicates by resolution height
+     * - Caps at maxCount options (default 4)
+     * - Always returns at least one fallback entry
+     *
+     * @param {Array}  formats   raw formats array from yt-dlp JSON
+     * @param {number} maxCount  max number of quality options to return
+     * @returns {Array}  [{height, ext, size}, ...]
+     */
+    parseFormats(formats = [], maxCount = 4) {
+        const seenHeights   = new Set();
+        const uniqueFormats = [];
+
+        const sorted = formats
+            .filter(f => f.vcodec && f.vcodec !== 'none')
+            .sort((a, b) => {
+                // H.264 formats first (widest compatibility), then high-to-low resolution
+                const aH264 = /^(avc|h264)/i.test(a.vcodec || '') ? 1 : 0;
+                const bH264 = /^(avc|h264)/i.test(b.vcodec || '') ? 1 : 0;
+                if (bH264 !== aH264) return bH264 - aH264;
+                return (b.height || 0) - (a.height || 0);
+            });
+
+        for (const f of sorted) {
+            const h = f.height || 'HD';
+            if (!seenHeights.has(h) && uniqueFormats.length < maxCount) {
+                seenHeights.add(h);
+                uniqueFormats.push({
+                    height: h,
+                    ext:    'mp4',
+                    size:   f.filesize || f.filesize_approx || null,
+                    // Store the exact yt-dlp format ID so the download route
+                    // can request this precise stream instead of guessing by height.
+                    fid:    f.format_id || null,
+                });
+            }
+        }
+
+        // Always return at least one download option
+        if (uniqueFormats.length === 0) {
+            uniqueFormats.push({ height: 'HD', ext: 'mp4', size: null });
+        }
+
+        return uniqueFormats;
+    }
+
     async executeYtdlp(url, extraOpts = {}) {
         return new Promise((resolve, reject) => {
             const args = [

@@ -1,67 +1,60 @@
+/**
+ * SocialProvider
+ * ──────────────
+ * Handles Snapchat, Pinterest, and any other platform not covered by a
+ * dedicated provider. Uses yt-dlp with platform-specific headers.
+ *
+ * Supported platforms:
+ *   - Snapchat  : public Spotlight videos and public Story links
+ *                 (snapchat.com, t.snapchat.com)
+ *   - Pinterest : video pins from pinterest.com or pin.it short links
+ *   - Generic   : any other URL — tried with default yt-dlp settings
+ *
+ * Format selection is handled by BaseProvider.parseFormats().
+ */
+
 const BaseProvider = require('./BaseProvider');
 
 class SocialProvider extends BaseProvider {
     async getInfo(url) {
-        const isInstagram = url.includes('instagram.com');
-        const isTwitter   = url.includes('x.com') || url.includes('twitter.com');
+        const isSnapchat  = url.includes('snapchat.com') || url.includes('t.snapchat.com');
+        const isPinterest = url.includes('pinterest.com') || url.includes('pin.it');
 
-        const extraArgs = {};
+        let extraArgs = {};
 
-        if (isInstagram) {
-            extraArgs.addHeader = [
-                'referer:https://www.instagram.com/',
-                'origin:https://www.instagram.com',
-            ];
-        } else if (isTwitter) {
-            // Twitter/X requires auth for most content.
-            // Try syndication API as best-effort fallback.
-            extraArgs.extractorArgs = 'twitter:api=syndication';
-            extraArgs.addHeader = [
-                'referer:https://x.com/',
-                'origin:https://x.com',
-            ];
+        if (isSnapchat) {
+            // Snapchat CDN needs referer + browser UA to allow video access
+            extraArgs = {
+                addHeader: [
+                    'referer:https://www.snapchat.com/',
+                    'origin:https://www.snapchat.com',
+                    'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                ],
+            };
+        } else if (isPinterest) {
+            // Pinterest requires referer + browser UA for video pin metadata
+            extraArgs = {
+                addHeader: [
+                    'referer:https://www.pinterest.com/',
+                    'origin:https://www.pinterest.com',
+                    'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                ],
+            };
         }
+        // Generic: no extra args — yt-dlp will try with its own defaults
 
         const output = await this.executeYtdlp(url, extraArgs);
 
-        const formats = output.formats || [];
-
-        // Prefer H.264 (avc/h264) for maximum compatibility
-        const seenHeights = new Set();
-        const uniqueFormats = [];
-
-        const sorted = formats
-            .filter(f => f.vcodec && f.vcodec !== 'none')
-            .sort((a, b) => {
-                const aH264 = /^(avc|h264)/i.test(a.vcodec || '') ? 1 : 0;
-                const bH264 = /^(avc|h264)/i.test(b.vcodec || '') ? 1 : 0;
-                if (bH264 !== aH264) return bH264 - aH264;
-                return (b.height || 0) - (a.height || 0);
-            });
-
-        sorted.forEach(f => {
-            const h = f.height || 'HD';
-            if (!seenHeights.has(h) && uniqueFormats.length < 4) {
-                seenHeights.add(h);
-                uniqueFormats.push({
-                    height: h,
-                    ext:    'mp4',
-                    size:   f.filesize || f.filesize_approx || null,
-                });
-            }
-        });
-
-        if (uniqueFormats.length === 0) {
-            uniqueFormats.push({ height: 'HD', ext: 'mp4', size: null });
-        }
-
-        const provider = isInstagram ? 'instagram' : isTwitter ? 'twitter' : 'generic';
+        // Determine provider label for the frontend badge
+        const provider = isSnapchat  ? 'snapchat'
+                       : isPinterest ? 'pinterest'
+                       : 'generic';
 
         return {
-            title:     output.title     || 'Video',
-            thumbnail: output.thumbnail || '',
+            title:     output.title           || 'Video',
+            thumbnail: output.thumbnail       || '',
             duration:  output.duration_string || '0:00',
-            formats:   uniqueFormats,
+            formats:   this.parseFormats(output.formats),
             provider,
         };
     }

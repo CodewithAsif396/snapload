@@ -57,7 +57,14 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
       "Bash(node --check server.js)",
-      "Bash(node --check providers/TikTokProvider.js)"
+      "Bash(node --check providers/TikTokProvider.js)",
+      "Read(//c/Users/asifk/.claude/**)",
+      "Bash(node --check providers/SocialProvider.js)",
+      "Bash(node --check providers/InstagramProvider.js)",
+      "Bash(node --check providers/TwitterProvider.js)",
+      "Bash(node --check providers/FacebookProvider.js)",
+      "Bash(node --check providers/BaseProvider.js)",
+      "Bash(node --check d:/doomsdaysnap/server.js)"
     ]
   }
 }

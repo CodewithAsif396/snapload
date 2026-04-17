@@ -3,7 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doomsdaysnap - Download Any Video Instantly</title>
+    <title>Doomsdaysnap - Download Videos from YouTube, TikTok, Instagram, Facebook, Snapchat & Pinterest</title>
+    <meta name="description" content="Free HD video downloader for YouTube, TikTok, Instagram, Twitter/X, Facebook, Snapchat and Pinterest. No watermark, no sign-up, instant download.">
+    <meta name="keywords" content="video downloader, youtube downloader, tiktok downloader, instagram downloader, facebook video downloader, snapchat downloader, pinterest video downloader, twitter video downloader, hd video downloader, no watermark">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://doomsdaysnap.online/app">
+    <meta property="og:title"       content="Doomsdaysnap — Free Video Downloader for 7 Platforms">
+    <meta property="og:description" content="Download HD videos from YouTube, TikTok, Instagram, Twitter/X, Facebook, Snapchat and Pinterest. No watermark, no sign-up.">
+    <meta property="og:url"         content="https://doomsdaysnap.online/app">
+    <meta property="og:type"        content="website">
+    <meta property="og:image"       content="https://doomsdaysnap.online/og-image.jpg">
+    <meta name="twitter:card"        content="summary_large_image">
+    <meta name="twitter:title"       content="Doomsdaysnap — Free Video Downloader">
+    <meta name="twitter:description" content="Download from YouTube, TikTok, Instagram, Facebook, Snapchat & Pinterest. Free, HD, no watermark.">
+    <meta name="twitter:image"       content="https://doomsdaysnap.online/og-image.jpg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -140,24 +153,65 @@
                 No watermarks, no sign-up required.
             </p>
 
-            <!-- Platform Tabs -->
-            <div class="max-w-xl mx-auto mb-6">
-                <div class="flex p-1.5 glass-card rounded-2xl relative overflow-hidden" id="platform-tabs">
-                    <!-- Sliding indicator — width and left are controlled by JS -->
-                    <div id="tab-indicator" class="absolute h-[calc(100%-12px)] top-1.5 left-1.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl transition-all duration-300 ease-out z-0 shadow-lg shadow-purple-500/25" style="width:calc(25% - 3px)"></div>
+            <!-- ── Platform Tabs ──────────────────────────────────────────────
+                 7 platforms: YouTube | TikTok | Instagram | X | Facebook | Snapchat | Pinterest
+                 On mobile the row scrolls horizontally (overflow-x: auto, each tab min-w-[72px]).
+                 On sm+ all tabs are visible (flex-1).
+                 The sliding indicator is positioned in pixels by JS switchTab() using
+                 getBoundingClientRect() — works regardless of the number of tabs.
+            ── -->
+            <div class="max-w-3xl mx-auto mb-6">
+                <div class="relative">
+                    <!-- Scrollable tab strip -->
+                    <div class="flex p-1.5 glass-card rounded-2xl relative overflow-x-auto scrollbar-hide" id="platform-tabs"
+                         style="-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory">
+                        <!-- Sliding indicator — JS sets left/width in pixels via getBoundingClientRect() -->
+                        <div id="tab-indicator"
+                             class="absolute h-[calc(100%-12px)] top-1.5 bg-gradient-to-r from-red-600 to-red-500 rounded-xl transition-all duration-300 ease-out z-0 shadow-lg shadow-red-500/25"
+                             style="left:6px;width:60px"></div>
 
-                    <button class="platform-tab relative z-10 flex-1 flex items-center justify-center gap-2 py-3 text-white font-semibold transition-colors duration-200" data-platform="youtube" data-index="0">
-                        <i class="fa-brands fa-youtube text-lg"></i><span class="hidden sm:inline text-sm">YouTube</span>
-                    </button>
-                    <button class="platform-tab relative z-10 flex-1 flex items-center justify-center gap-2 py-3 text-gray-400 font-semibold transition-colors duration-200" data-platform="tiktok" data-index="1">
-                        <i class="fa-brands fa-tiktok text-lg"></i><span class="hidden sm:inline text-sm">TikTok</span>
-                    </button>
-                    <button class="platform-tab relative z-10 flex-1 flex items-center justify-center gap-2 py-3 text-gray-400 font-semibold transition-colors duration-200" data-platform="instagram" data-index="2">
-                        <i class="fa-brands fa-instagram text-lg"></i><span class="hidden sm:inline text-sm">Instagram</span>
-                    </button>
-                    <button class="platform-tab relative z-10 flex-1 flex items-center justify-center gap-2 py-3 text-gray-400 font-semibold transition-colors duration-200" data-platform="twitter" data-index="3">
-                        <i class="fa-brands fa-x-twitter text-lg"></i><span class="hidden sm:inline text-sm">Twitter/X</span>
-                    </button>
+                        <!-- YouTube -->
+                        <button class="platform-tab relative z-10 flex-shrink-0 flex-1 min-w-[72px] flex flex-col items-center justify-center gap-0.5 py-2.5 px-2 text-white font-semibold transition-colors duration-200" data-platform="youtube" data-index="0" style="scroll-snap-align:start">
+                            <i class="fa-brands fa-youtube text-base"></i>
+                            <span class="text-[9px] leading-none">YT</span>
+                        </button>
+
+                        <!-- TikTok -->
+                        <button class="platform-tab relative z-10 flex-shrink-0 flex-1 min-w-[72px] flex flex-col items-center justify-center gap-0.5 py-2.5 px-2 text-gray-400 font-semibold transition-colors duration-200" data-platform="tiktok" data-index="1" style="scroll-snap-align:start">
+                            <i class="fa-brands fa-tiktok text-base"></i>
+                            <span class="text-[9px] leading-none">TikTok</span>
+                        </button>
+
+                        <!-- Instagram -->
+                        <button class="platform-tab relative z-10 flex-shrink-0 flex-1 min-w-[72px] flex flex-col items-center justify-center gap-0.5 py-2.5 px-2 text-gray-400 font-semibold transition-colors duration-200" data-platform="instagram" data-index="2" style="scroll-snap-align:start">
+                            <i class="fa-brands fa-instagram text-base"></i>
+                            <span class="text-[9px] leading-none">IG</span>
+                        </button>
+
+                        <!-- X / Twitter — fa-x-twitter is the official X logo in Font Awesome 6.4+ -->
+                        <button class="platform-tab relative z-10 flex-shrink-0 flex-1 min-w-[72px] flex flex-col items-center justify-center gap-0.5 py-2.5 px-2 text-gray-400 font-semibold transition-colors duration-200" data-platform="twitter" data-index="3" style="scroll-snap-align:start">
+                            <i class="fa-brands fa-x-twitter text-base"></i>
+                            <span class="text-[9px] leading-none font-bold">X</span>
+                        </button>
+
+                        <!-- Facebook -->
+                        <button class="platform-tab relative z-10 flex-shrink-0 flex-1 min-w-[72px] flex flex-col items-center justify-center gap-0.5 py-2.5 px-2 text-gray-400 font-semibold transition-colors duration-200" data-platform="facebook" data-index="4" style="scroll-snap-align:start">
+                            <i class="fa-brands fa-facebook text-base"></i>
+                            <span class="text-[9px] leading-none">FB</span>
+                        </button>
+
+                        <!-- Snapchat -->
+                        <button class="platform-tab relative z-10 flex-shrink-0 flex-1 min-w-[72px] flex flex-col items-center justify-center gap-0.5 py-2.5 px-2 text-gray-400 font-semibold transition-colors duration-200" data-platform="snapchat" data-index="5" style="scroll-snap-align:start">
+                            <i class="fa-brands fa-snapchat text-base"></i>
+                            <span class="text-[9px] leading-none">SC</span>
+                        </button>
+
+                        <!-- Pinterest -->
+                        <button class="platform-tab relative z-10 flex-shrink-0 flex-1 min-w-[72px] flex flex-col items-center justify-center gap-0.5 py-2.5 px-2 text-gray-400 font-semibold transition-colors duration-200" data-platform="pinterest" data-index="6" style="scroll-snap-align:start">
+                            <i class="fa-brands fa-pinterest text-base"></i>
+                            <span class="text-[9px] leading-none">PIN</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -198,7 +252,7 @@
                 </button>
             </div>
 
-            <p class="text-xs text-gray-600 mt-2">Supports YouTube, TikTok, Instagram, Twitter/X &amp; more</p>
+            <p class="text-xs text-gray-600 mt-2">Supports YouTube, TikTok, Instagram, Twitter/X, Facebook, Snapchat, Pinterest &amp; more</p>
         </section>
 
         <!-- ── Loading HUD ── -->
@@ -288,34 +342,55 @@
                 <h2 class="text-3xl font-bold mb-3">Supported Platforms</h2>
                 <p class="text-gray-400">Download from your favourite social networks, seamlessly.</p>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="glass-card rounded-2xl p-6 hover:-translate-y-2 transition-transform duration-300 border-t-2 border-t-[#25F4EE]/40">
-                    <div class="w-12 h-12 rounded-full bg-[#25F4EE]/10 flex items-center justify-center mb-5">
-                        <i class="fa-brands fa-tiktok text-2xl text-white drop-shadow-[0_0_8px_rgba(37,244,238,0.8)]"></i>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
+                <div class="glass-card rounded-2xl p-5 hover:-translate-y-2 transition-transform duration-300 border-t-2 border-t-[#25F4EE]/40">
+                    <div class="w-10 h-10 rounded-full bg-[#25F4EE]/10 flex items-center justify-center mb-4">
+                        <i class="fa-brands fa-tiktok text-xl text-white drop-shadow-[0_0_8px_rgba(37,244,238,0.8)]"></i>
                     </div>
-                    <h3 class="text-lg font-bold mb-1 text-white">TikTok</h3>
-                    <p class="text-gray-400 text-sm">Download TikTok videos in original quality without watermarks.</p>
+                    <h3 class="text-base font-bold mb-1 text-white">TikTok</h3>
+                    <p class="text-gray-400 text-xs">Download TikTok videos in original quality without watermarks.</p>
                 </div>
-                <div class="glass-card rounded-2xl p-6 hover:-translate-y-2 transition-transform duration-300 border-t-2 border-t-red-500/40">
-                    <div class="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-5">
-                        <i class="fa-brands fa-youtube text-2xl text-red-500 drop-shadow-[0_0_8px_rgba(255,0,0,0.8)]"></i>
+                <div class="glass-card rounded-2xl p-5 hover:-translate-y-2 transition-transform duration-300 border-t-2 border-t-red-500/40">
+                    <div class="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                        <i class="fa-brands fa-youtube text-xl text-red-500 drop-shadow-[0_0_8px_rgba(255,0,0,0.8)]"></i>
                     </div>
-                    <h3 class="text-lg font-bold mb-1 text-white">YouTube</h3>
-                    <p class="text-gray-400 text-sm">Save Shorts &amp; Videos up to 4K, or extract audio as MP3.</p>
+                    <h3 class="text-base font-bold mb-1 text-white">YouTube</h3>
+                    <p class="text-gray-400 text-xs">Save Shorts &amp; Videos up to 4K, or extract audio as MP3.</p>
                 </div>
-                <div class="glass-card rounded-2xl p-6 hover:-translate-y-2 transition-transform duration-300 border-t-2 border-t-pink-500/40">
-                    <div class="w-12 h-12 rounded-full bg-gradient-to-tr from-[#fd5949]/20 to-[#d6249f]/20 flex items-center justify-center mb-5">
-                        <i class="fa-brands fa-instagram text-2xl" style="background:linear-gradient(135deg,#fd5949,#d6249f);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent"></i>
+                <div class="glass-card rounded-2xl p-5 hover:-translate-y-2 transition-transform duration-300 border-t-2 border-t-pink-500/40">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-[#fd5949]/20 to-[#d6249f]/20 flex items-center justify-center mb-4">
+                        <i class="fa-brands fa-instagram text-xl" style="background:linear-gradient(135deg,#fd5949,#d6249f);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent"></i>
                     </div>
-                    <h3 class="text-lg font-bold mb-1 text-white">Instagram</h3>
-                    <p class="text-gray-400 text-sm">Fetch Reels, Stories, and IGTV videos directly to your device.</p>
+                    <h3 class="text-base font-bold mb-1 text-white">Instagram</h3>
+                    <p class="text-gray-400 text-xs">Fetch Reels, Stories, and IGTV videos directly to your device.</p>
                 </div>
-                <div class="glass-card rounded-2xl p-6 hover:-translate-y-2 transition-transform duration-300 border-t-2 border-t-white/20">
-                    <div class="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center mb-5">
-                        <i class="fa-brands fa-x-twitter text-2xl text-white"></i>
+                <div class="glass-card rounded-2xl p-5 hover:-translate-y-2 transition-transform duration-300 border-t-2 border-t-white/20">
+                    <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-4">
+                        <i class="fa-brands fa-x-twitter text-xl text-white"></i>
                     </div>
-                    <h3 class="text-lg font-bold mb-1 text-white">X (Twitter)</h3>
-                    <p class="text-gray-400 text-sm">Grab high-quality videos and GIFs from X with a single click.</p>
+                    <h3 class="text-base font-bold mb-1 text-white">X (Twitter)</h3>
+                    <p class="text-gray-400 text-xs">Grab high-quality videos and GIFs from X with a single click.</p>
+                </div>
+                <div class="glass-card rounded-2xl p-5 hover:-translate-y-2 transition-transform duration-300 border-t-2 border-t-blue-500/40">
+                    <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
+                        <i class="fa-brands fa-facebook text-xl text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]"></i>
+                    </div>
+                    <h3 class="text-base font-bold mb-1 text-white">Facebook</h3>
+                    <p class="text-gray-400 text-xs">Download public Facebook videos and Reels in HD quality.</p>
+                </div>
+                <div class="glass-card rounded-2xl p-5 hover:-translate-y-2 transition-transform duration-300 border-t-2 border-t-yellow-400/40">
+                    <div class="w-10 h-10 rounded-full bg-yellow-400/10 flex items-center justify-center mb-4">
+                        <i class="fa-brands fa-snapchat text-xl text-yellow-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]"></i>
+                    </div>
+                    <h3 class="text-base font-bold mb-1 text-white">Snapchat</h3>
+                    <p class="text-gray-400 text-xs">Save public Spotlight &amp; Story videos instantly.</p>
+                </div>
+                <div class="glass-card rounded-2xl p-5 hover:-translate-y-2 transition-transform duration-300 border-t-2 border-t-red-500/40">
+                    <div class="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                        <i class="fa-brands fa-pinterest text-xl text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]"></i>
+                    </div>
+                    <h3 class="text-base font-bold mb-1 text-white">Pinterest</h3>
+                    <p class="text-gray-400 text-xs">Download Pinterest video pins in full quality.</p>
                 </div>
             </div>
         </section>
@@ -501,6 +576,8 @@
         });
 
         // ── Platform Tab Data ────────────────────────────────────────────────
+        // Each entry drives: input placeholder, input icon, tab indicator gradient,
+        // download button color, and the sample URL used by the Sample button.
         var platformData = {
             youtube: {
                 placeholder: 'Paste YouTube Video or Shorts link…',
@@ -533,41 +610,99 @@
                 glow:   'from-slate-300 to-slate-400',
                 shadow: 'shadow-white/10',
                 sample: ''
+            },
+            // Facebook: public video/reel URLs from facebook.com or fb.watch short links
+            facebook: {
+                placeholder: 'Paste Facebook Video or Reel link…',
+                icon:   'fa-brands fa-facebook',
+                color:  'from-blue-600 to-blue-500',
+                glow:   'from-blue-600 to-blue-500',
+                shadow: 'shadow-blue-500/25',
+                sample: ''
+            },
+            // Snapchat: public Spotlight videos and public story links
+            snapchat: {
+                placeholder: 'Paste Snapchat Spotlight or Story link…',
+                icon:   'fa-brands fa-snapchat',
+                color:  'from-yellow-400 to-yellow-300',
+                glow:   'from-yellow-400 to-yellow-300',
+                shadow: 'shadow-yellow-400/25',
+                sample: ''
+            },
+            // Pinterest: video pins from pinterest.com or pin.it short links
+            pinterest: {
+                placeholder: 'Paste Pinterest Video Pin link…',
+                icon:   'fa-brands fa-pinterest',
+                color:  'from-red-600 to-rose-500',
+                glow:   'from-red-600 to-rose-500',
+                shadow: 'shadow-red-500/25',
+                sample: ''
             }
         };
 
         // ── Switch Tab ───────────────────────────────────────────────────────
+        // Called on tab click or URL auto-detect.
+        // Updates: sliding indicator (pixel-based, works for any number of tabs),
+        //          input placeholder, input icon, glow ring, Fetch button color,
+        //          and active-tab text colour.
+        //
+        // Pixel positioning via getBoundingClientRect() is used instead of percentages
+        // so adding/removing tabs never requires touching this formula.
+        var tabsContainer = document.getElementById('platform-tabs');
+
         function switchTab(platform, index) {
             currentPlatform = platform;
             var d = platformData[platform];
+            if (!d) return; // guard against unknown platform key
 
-            // Move + recolor indicator (width stays constant via HTML style)
-            indicator.style.left = 'calc(' + (index * 25) + '% + ' + (6 - index * 3) + 'px)';
-            indicator.className  = [
+            // ── Move indicator to match the active tab ──────────────────────
+            // We measure the tab's position relative to the scrollable container.
+            var activeTab = Array.from(tabs).find(function (t) { return t.dataset.platform === platform; });
+            if (activeTab && tabsContainer) {
+                var containerRect = tabsContainer.getBoundingClientRect();
+                var tabRect       = activeTab.getBoundingClientRect();
+                // scrollLeft accounts for the container being partially scrolled on mobile
+                var leftPx  = tabRect.left - containerRect.left + tabsContainer.scrollLeft + 3;
+                var widthPx = tabRect.width - 6;
+                indicator.style.left  = leftPx  + 'px';
+                indicator.style.width = widthPx + 'px';
+                // Scroll the clicked tab into view smoothly on mobile
+                activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+
+            // Recolor the indicator gradient to match the platform brand colour
+            indicator.className = [
                 'absolute h-[calc(100%-12px)] top-1.5 rounded-xl transition-all duration-300 ease-out z-0 shadow-lg',
                 'bg-gradient-to-r', d.color, d.shadow
             ].join(' ');
-            indicator.style.width = 'calc(25% - 3px)';
 
-            // Update input
+            // ── Update input box ────────────────────────────────────────────
             urlInput.placeholder = d.placeholder;
-            if (inputIcon) {
-                inputIcon.className = d.icon + ' text-gray-400';
-            }
+            if (inputIcon) inputIcon.className = d.icon + ' text-gray-400';
+
+            // Recolor the input glow ring
             inputGlow.className = 'absolute -inset-1 bg-gradient-to-r ' + d.glow + ' rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-700';
+
+            // Recolor the Fetch button gradient
             downloadBtn.className = [
                 'w-full sm:w-auto font-semibold py-3 px-7 rounded-xl shadow-lg transition-all',
                 'flex items-center justify-center gap-2 active:scale-95 flex-shrink-0',
                 'bg-gradient-to-r', d.color, 'text-white'
             ].join(' ');
 
+            // ── Highlight active tab, dim all others ────────────────────────
             tabs.forEach(function (t) {
                 t.classList.remove('text-white');
                 t.classList.add('text-gray-400');
             });
-            var active = Array.from(tabs).find(function (t) { return t.dataset.platform === platform; });
-            if (active) { active.classList.remove('text-gray-400'); active.classList.add('text-white'); }
+            if (activeTab) { activeTab.classList.remove('text-gray-400'); activeTab.classList.add('text-white'); }
         }
+
+        // Re-position indicator on window resize (tab widths change at breakpoints)
+        window.addEventListener('resize', function () {
+            var active = Array.from(tabs).find(function (t) { return t.dataset.platform === currentPlatform; });
+            if (active) switchTab(currentPlatform, parseInt(active.dataset.index, 10));
+        });
 
         tabs.forEach(function (tab) {
             tab.addEventListener('click', function () {
@@ -576,12 +711,17 @@
         });
 
         // ── URL Auto-Detect ──────────────────────────────────────────────────
+        // When the user pastes or types a URL, we match its domain to auto-switch
+        // to the correct platform tab — no manual tab click needed.
         function detectPlatform(url) {
             if (!url) return null;
-            if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
-            if (url.includes('tiktok.com'))                               return 'tiktok';
-            if (url.includes('instagram.com'))                            return 'instagram';
-            if (url.includes('x.com') || url.includes('twitter.com'))    return 'twitter';
+            if (url.includes('youtube.com') || url.includes('youtu.be'))        return 'youtube';
+            if (url.includes('tiktok.com'))                                      return 'tiktok';
+            if (url.includes('instagram.com'))                                   return 'instagram';
+            if (url.includes('x.com') || url.includes('twitter.com'))           return 'twitter';
+            if (url.includes('facebook.com') || url.includes('fb.watch'))       return 'facebook';
+            if (url.includes('snapchat.com') || url.includes('t.snapchat.com')) return 'snapchat';
+            if (url.includes('pinterest.com') || url.includes('pin.it'))        return 'pinterest';
             return null;
         }
 
@@ -764,8 +904,16 @@
                 document.getElementById('res-duration').textContent = data.duration  || '--:--';
                 document.getElementById('res-title').textContent    = data.title     || 'Unknown Video';
 
-                // Provider badge
-                var providerIcons = { youtube:'fa-youtube', tiktok:'fa-tiktok', instagram:'fa-instagram', twitter:'fa-x-twitter' };
+                // Provider badge — maps backend provider name → Font Awesome brand icon
+                var providerIcons = {
+                    youtube:   'fa-youtube',
+                    tiktok:    'fa-tiktok',
+                    instagram: 'fa-instagram',
+                    twitter:   'fa-x-twitter',
+                    facebook:  'fa-facebook',
+                    snapchat:  'fa-snapchat',
+                    pinterest: 'fa-pinterest',
+                };
                 var pIcon = providerIcons[data.provider] || 'fa-video';
                 document.getElementById('res-provider-badge').innerHTML =
                     '<i class="fa-brands ' + pIcon + '"></i> ' + (data.provider || 'video').charAt(0).toUpperCase() + (data.provider || 'video').slice(1);
@@ -780,15 +928,16 @@
                         var sizeStr = f.size ? (f.size / (1024 * 1024)).toFixed(1) + ' MB' : 'HD Quality';
                         var desc    = (f.ext || 'mp4').toUpperCase() + ' · ' + sizeStr;
 
+                        var fidParam = f.fid ? '&fid=' + encodeURIComponent(f.fid) : '';
                         if (typeof f.height === 'number') {
                             if      (f.height >= 1440) { color = 'text-purple-400'; badge = '4K/2K'; }
                             else if (f.height >= 1080) { color = 'text-purple-400'; badge = 'FHD';   }
                             else if (f.height >= 720)  { color = 'text-indigo-400'; badge = 'HD';    }
                             html += buildFormatRow(f.height + 'p Video', desc, 'video', color,
-                                '/api/download?url=' + encodedUrl + '&type=' + f.height, badge);
+                                '/api/download?url=' + encodedUrl + '&type=' + f.height + fidParam, badge);
                         } else {
                             html += buildFormatRow('Best Quality', desc, 'video', 'text-purple-400',
-                                '/api/download?url=' + encodedUrl + '&type=1080', 'HD');
+                                '/api/download?url=' + encodedUrl + '&type=1080' + fidParam, 'HD');
                         }
                     });
                 } else {

@@ -10,9 +10,13 @@ const { sanitizeUrl } = require('./utils/sanitizer');
 const ffmpegPath      = require('ffmpeg-static');
 
 
-const YouTubeProvider = require('./providers/YouTubeProvider');
-const TikTokProvider  = require('./providers/TikTokProvider');
-const SocialProvider  = require('./providers/SocialProvider');
+// ── Provider imports — one file per platform ──────────────────────────────────
+const YouTubeProvider  = require('./providers/YouTubeProvider');
+const TikTokProvider   = require('./providers/TikTokProvider');
+const InstagramProvider = require('./providers/InstagramProvider');
+const TwitterProvider  = require('./providers/TwitterProvider');
+const FacebookProvider = require('./providers/FacebookProvider');
+const SocialProvider   = require('./providers/SocialProvider');   // Snapchat + Pinterest + generic
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -104,34 +108,61 @@ function validateUrl(url) {
 }
 
 // ─── Provider Registry ────────────────────────────────────────────────────────
+// Each platform has its own SocialProvider instance (same class, different headers in getInfo).
+// YouTubeProvider and TikTokProvider have dedicated logic for their complex APIs.
+// ── Provider instances — one per platform ────────────────────────────────────
 const providers = {
     youtube:   new YouTubeProvider(),
     tiktok:    new TikTokProvider(),
-    instagram: new SocialProvider(),
-    twitter:   new SocialProvider(),
-    generic:   new SocialProvider()
+    instagram: new InstagramProvider(),
+    twitter:   new TwitterProvider(),
+    facebook:  new FacebookProvider(),
+    social:    new SocialProvider(),   // Snapchat + Pinterest + generic fallback
 };
 
+/**
+ * Pick the right provider based on the URL domain.
+ * Falls back to SocialProvider for Snapchat, Pinterest, and unknown URLs.
+ */
 function getProvider(url) {
-    if (url.includes('youtube.com') || url.includes('youtu.be')) return providers.youtube;
-    if (url.includes('tiktok.com'))                               return providers.tiktok;
-    if (url.includes('instagram.com'))                            return providers.instagram;
-    if (url.includes('x.com') || url.includes('twitter.com'))    return providers.twitter;
-    return providers.generic;
+    if (url.includes('youtube.com') || url.includes('youtu.be'))        return providers.youtube;
+    if (url.includes('tiktok.com'))                                      return providers.tiktok;
+    if (url.includes('instagram.com'))                                   return providers.instagram;
+    if (url.includes('x.com') || url.includes('twitter.com'))           return providers.twitter;
+    if (url.includes('facebook.com') || url.includes('fb.watch'))       return providers.facebook;
+    return providers.social; // handles Snapchat, Pinterest, and any other URL
 }
 
 // ─── Build format string ──────────────────────────────────────────────────────
-function buildFormat(type) {
+// fid = exact yt-dlp format_id from the /api/info phase (e.g. "137", "18").
+//       When provided we request that exact stream → correct resolution guaranteed.
+// type = height number (720, 1080 …) or "audio" — used as fallback when fid is absent.
+function buildFormat(type, fid) {
     if (type === 'audio') {
         return { format: 'bestaudio[ext=m4a]/bestaudio/best', ext: 'mp3', mime: 'audio/mpeg' };
     }
-    const h = parseInt(type) || 720;
+
+    // ── Exact format ID path (preferred) ─────────────────────────────────────
+    // fid came from the info dump so we know this stream exists.
+    // We still append bestaudio because most video-only streams need it merged in.
+    if (fid && fid !== 'null' && fid !== 'undefined' && fid !== 'HD') {
+        const format = [
+            `${fid}+bestaudio[ext=m4a]`,
+            `${fid}+bestaudio`,
+            fid,            // combined stream (no separate audio needed)
+            'best',         // ultimate fallback
+        ].join('/');
+        return { format, ext: 'mp4', mime: 'video/mp4' };
+    }
+
+    // ── Height-based fallback (used when fid is unavailable) ─────────────────
     // Priority: H.264 separate → H.264 combined → mp4 fallback → anything
+    const h = parseInt(type) || 720;
     const format = [
+        `bestvideo[height=${h}][ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]`,
+        `bestvideo[height=${h}][vcodec^=avc]+bestaudio`,
         `bestvideo[height<=${h}][ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]`,
         `bestvideo[height<=${h}][vcodec^=avc]+bestaudio`,
-        `best[height<=${h}][vcodec^=h264][ext=mp4]`,
-        `best[height<=${h}][vcodec^=h264]`,
         `best[height<=${h}][ext=mp4]`,
         `best[height<=${h}]`,
         'best',
@@ -140,24 +171,30 @@ function buildFormat(type) {
 }
 
 // ─── Get direct CDN url(s) from yt-dlp ───────────────────────────────────────
-// Returns array of URLs. 1 url = single stream, 2 urls = needs merge.
-function getDirectUrls(safeUrl, format) {
+// Returns array of URLs:
+//   1 URL  → combined stream, pipe directly to client at full CDN speed
+//   2 URLs → separate video+audio streams, must merge via ffmpeg
+//   0 URLs → yt-dlp could not resolve (fall back to spawnMergeStream)
+//
+// extraArgs allows passing platform-specific headers (referer, UA, etc.)
+function getDirectUrls(safeUrl, format, extraArgs = []) {
     return new Promise((resolve) => {
         const args = [
             safeUrl, '-f', format,
             '--no-warnings', '--no-check-certificate', '--no-playlist',
             '--force-ipv4', '--geo-bypass',
             ...COOKIES_ARGS,
+            ...extraArgs,
             '--get-url',
         ];
-        const proc  = spawn(YTDLP, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-        let   out   = '';
+        const proc = spawn(YTDLP, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+        let   out  = '';
         proc.stdout.on('data', d => out += d.toString());
         proc.on('close', () => {
             resolve(out.trim().split('\n').filter(l => l.startsWith('http')));
         });
         proc.on('error', () => resolve([]));
-        setTimeout(() => { proc.kill('SIGKILL'); resolve([]); }, 35000);
+        setTimeout(() => { proc.kill('SIGKILL'); resolve([]); }, 30000);
     });
 }
 
@@ -210,11 +247,15 @@ function pipeCdnUrl(cdnUrl, res, req, extraHeaders = {}, maxRedirects = 8) {
 }
 
 // ─── Merge video+audio via yt-dlp+ffmpeg streaming ───────────────────────────
+// Used when direct CDN pipe is not possible (separate video+audio streams need merging,
+// or the platform blocks direct hotlinking).
+// --concurrent-fragments speeds up fragment-based streams (HLS/DASH).
 function spawnMergeStream(safeUrl, format, res, req, extraArgs = [], cookiesArgs = COOKIES_ARGS) {
     const args = [
         safeUrl,
         '-f', format,
         '--no-warnings', '--no-check-certificate', '--no-playlist',
+        '--concurrent-fragments', '4',   // download 4 fragments in parallel → faster
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
         ...extraArgs,
@@ -292,7 +333,10 @@ app.post('/api/info', rateLimit, async (req, res) => {
         else if (m.includes('HTTP Error 404'))                    msg = 'Video not found — please check the URL.';
         else if (m.includes('is not a valid URL') || m.includes('truncated')) msg = 'Invalid URL. Please copy the complete link directly.';
         else if (m.includes('No video') && m.includes('tweet'))  msg = 'X/Twitter now requires login to download videos. This tweet may have no video or be private.';
-        else if (m.includes('tiktok') || m.includes('TikTok'))   msg = 'Could not fetch TikTok video. The video may be private or region-restricted.';
+        else if (m.includes('tiktok') || m.includes('TikTok'))   msg = 'Could not fetch TikTok video. The video may be private or region-restricted.'
+        else if (m.includes('facebook') || m.includes('Facebook'))   msg = 'Could not fetch Facebook video. Only public videos are supported.'
+        else if (m.includes('snapchat') || m.includes('Snapchat'))   msg = 'Could not fetch Snapchat video. Only public Spotlight/Story videos are supported.'
+        else if (m.includes('pinterest') || m.includes('Pinterest')) msg = 'Could not fetch Pinterest video. Make sure the pin contains a video.';
         return res.status(500).json({ error: msg, details: m.slice(0, 300) });
     }
 });
@@ -319,23 +363,80 @@ const TWITTER_ARGS = [
     '--add-header', 'origin:https://x.com',
     '--merge-output-format', 'mp4',
 ];
+// Facebook: realistic browser UA is required to access public video CDN URLs
+const FACEBOOK_ARGS = [
+    '--add-header', 'referer:https://www.facebook.com/',
+    '--add-header', 'origin:https://www.facebook.com',
+    '--add-header', 'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    '--merge-output-format', 'mp4',
+];
+// Snapchat: public Spotlight & story videos — referer needed for CDN access
+const SNAPCHAT_ARGS = [
+    '--add-header', 'referer:https://www.snapchat.com/',
+    '--add-header', 'origin:https://www.snapchat.com',
+    '--add-header', 'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    '--merge-output-format', 'mp4',
+];
+// Pinterest: video pins — referer + desktop UA for best yt-dlp extraction
+const PINTEREST_ARGS = [
+    '--add-header', 'referer:https://www.pinterest.com/',
+    '--add-header', 'origin:https://www.pinterest.com',
+    '--add-header', 'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    '--merge-output-format', 'mp4',
+];
 
-// Download — smart routing:
-//   YouTube  → get-url first: 1 url = direct CDN pipe, 2 urls = ffmpeg merge
-//   TikTok   → yt-dlp with mobile UA + TikTok extractor args
-//   Others   → yt-dlp stream directly
+// ─── Direct-then-merge helper ─────────────────────────────────────────────────
+// Used for Instagram, Twitter, Facebook, Snapchat, Pinterest.
+// 1. Ask yt-dlp to resolve CDN URL(s) with --get-url (fast, no ffmpeg).
+// 2. One URL  → pipe directly to client at full CDN speed.
+// 3. Two URLs → separate video+audio streams, merge via ffmpeg.
+// 4. Zero URLs → fall back to spawnMergeStream (yt-dlp handles everything).
+async function tryDirectThenMerge(safeUrl, format, res, req, extraArgs, cdnHeaders = {}) {
+    const urls = await getDirectUrls(safeUrl, format, extraArgs);
+
+    if (urls.length === 1) {
+        console.log(`[DOWNLOAD] direct CDN pipe → ${safeUrl.slice(0, 60)}`);
+        const ok = await pipeCdnUrl(urls[0], res, req, cdnHeaders);
+        if (ok) return;
+        // CDN rejected us (403/429) — fall through to merge stream
+        console.warn('[DOWNLOAD] CDN pipe failed, falling back to merge stream');
+    } else if (urls.length >= 2) {
+        console.log(`[DOWNLOAD] 2-stream CDN merge → ${safeUrl.slice(0, 60)}`);
+        // Separate video+audio — merge on the fly
+        spawnMergeStream(safeUrl, format, res, req, extraArgs);
+        return;
+    }
+
+    // urls.length === 0, or CDN pipe failed
+    console.log(`[DOWNLOAD] merge-stream fallback → ${safeUrl.slice(0, 60)}`);
+    if (!res.headersSent) {
+        spawnMergeStream(safeUrl, format, res, req, extraArgs);
+    }
+}
+
+// ─── Download route ───────────────────────────────────────────────────────────
+// Strategy (fastest → slowest):
+//   1. Direct CDN pipe  — yt-dlp --get-url resolves CDN link, Node pipes it at full speed
+//   2. ffmpeg merge     — separate video+audio streams, merged on the fly
+//   3. spawnMergeStream — yt-dlp handles everything (fallback, always works)
+//
+// fid (format_id) from /api/info ensures we download the exact stream shown in the UI.
 app.get('/api/download', rateLimit, async (req, res) => {
-    const { url, type } = req.query;
+    const { url, type, fid } = req.query;
     if (!validateUrl(url)) return res.status(400).send('Invalid URL.');
 
-    const safeUrl    = sanitizeUrl(url);
-    const isYouTube  = safeUrl.includes('youtube.com') || safeUrl.includes('youtu.be');
-    const isTikTok   = safeUrl.includes('tiktok.com');
+    const safeUrl     = sanitizeUrl(url);
+    const isYouTube   = safeUrl.includes('youtube.com') || safeUrl.includes('youtu.be');
+    const isTikTok    = safeUrl.includes('tiktok.com');
     const isInstagram = safeUrl.includes('instagram.com');
-    const isTwitter  = safeUrl.includes('x.com') || safeUrl.includes('twitter.com');
+    const isTwitter   = safeUrl.includes('x.com') || safeUrl.includes('twitter.com');
+    const isFacebook  = safeUrl.includes('facebook.com') || safeUrl.includes('fb.watch');
+    const isSnapchat  = safeUrl.includes('snapchat.com') || safeUrl.includes('t.snapchat.com');
+    const isPinterest = safeUrl.includes('pinterest.com') || safeUrl.includes('pin.it');
 
-    // TikTok serves combined video+audio — avoid split-stream format selector
-    const { format: rawFormat, ext, mime } = buildFormat(type);
+    // Build format selector — prefer exact fid over height guess
+    // TikTok uses combined stream selector (video+audio in one file)
+    const { format: rawFormat, ext, mime } = buildFormat(type, fid);
     const format = isTikTok
         ? `bestvideo*[height<=${parseInt(type) || 1080}]+bestaudio/best[height<=${parseInt(type) || 1080}]/best`
         : rawFormat;
@@ -587,13 +688,37 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 );
             }
         } else if (isInstagram) {
-            console.log(`[DOWNLOAD] Instagram → yt-dlp stream`);
-            spawnMergeStream(safeUrl, format, res, req, INSTAGRAM_ARGS);
+            // Try direct CDN first (fastest) — fall back to merge stream
+            await tryDirectThenMerge(safeUrl, format, res, req, INSTAGRAM_ARGS, {
+                'Referer': 'https://www.instagram.com/',
+                'Origin':  'https://www.instagram.com',
+            });
+
         } else if (isTwitter) {
-            console.log(`[DOWNLOAD] Twitter/X → yt-dlp stream`);
-            // 'best' picks the muxed stream (video+audio combined) — avoids merge failures
-            const twitterFormat = 'best[ext=mp4]/best/bestvideo+bestaudio';
-            spawnMergeStream(safeUrl, twitterFormat, res, req, TWITTER_ARGS);
+            // Twitter usually serves combined streams — try direct first
+            const twitterFormat = fid
+                ? format
+                : `best[ext=mp4]/best[height<=${parseInt(type)||720}][ext=mp4]/best`;
+            await tryDirectThenMerge(safeUrl, twitterFormat, res, req, TWITTER_ARGS, {
+                'Referer': 'https://x.com/',
+            });
+
+        } else if (isFacebook) {
+            await tryDirectThenMerge(safeUrl, format, res, req, FACEBOOK_ARGS, {
+                'Referer':    'https://www.facebook.com/',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            });
+
+        } else if (isSnapchat) {
+            await tryDirectThenMerge(safeUrl, format, res, req, SNAPCHAT_ARGS, {
+                'Referer': 'https://www.snapchat.com/',
+            });
+
+        } else if (isPinterest) {
+            await tryDirectThenMerge(safeUrl, format, res, req, PINTEREST_ARGS, {
+                'Referer': 'https://www.pinterest.com/',
+            });
+
         } else {
             console.log(`[DOWNLOAD] generic → yt-dlp stream`);
             spawnMergeStream(safeUrl, format, res, req);
