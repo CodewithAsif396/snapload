@@ -23,21 +23,25 @@ class SocialProvider extends BaseProvider {
         let extraArgs = {};
 
         if (isSnapchat) {
-            // Snapchat CDN needs referer + browser UA to allow video access
             extraArgs = {
                 addHeader: [
                     'referer:https://www.snapchat.com/',
                     'origin:https://www.snapchat.com',
                     'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'sec-ch-ua: "Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+                    'sec-ch-ua-mobile: ?0',
+                    'sec-ch-ua-platform: "Windows"',
                 ],
             };
         } else if (isPinterest) {
-            // Pinterest requires referer + browser UA for video pin metadata
             extraArgs = {
                 addHeader: [
                     'referer:https://www.pinterest.com/',
                     'origin:https://www.pinterest.com',
                     'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'sec-ch-ua: "Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+                    'sec-ch-ua-mobile: ?0',
+                    'sec-ch-ua-platform: "Windows"',
                 ],
             };
         }

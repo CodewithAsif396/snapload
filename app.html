@@ -259,20 +259,20 @@
     <main class="flex-grow pt-28 pb-12">
 
         <!-- ── Hero ── -->
-        <section class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-12 pb-12">
-            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card text-sm text-gray-300 mb-8 animate-float">
-                <span class="relative flex h-2.5 w-2.5">
+        <section class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-8 pb-10">
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card text-xs sm:text-sm text-gray-300 mb-6 animate-float">
+                <span class="relative flex h-2 w-2">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
                 </span>
                 Free &amp; Unlimited Video Downloads
             </div>
 
-            <h1 id="main-title" class="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight mb-4 sm:mb-6 leading-tight">
+            <h1 id="main-title" class="text-3xl sm:text-5xl md:text-7xl font-extrabold tracking-tight mb-3 sm:mb-6 leading-tight px-2">
                 Download Any Video <br>
                 <span id="platform-cycle" class="gradient-text italic">Without Limits.</span>
             </h1>
-            <p class="text-base sm:text-lg md:text-xl text-gray-400 mb-8 sm:mb-10 max-w-2xl mx-auto px-2">
+            <p class="text-sm sm:text-lg md:text-xl text-gray-400 mb-6 sm:mb-10 max-w-2xl mx-auto px-4">
                 The fastest way to save high-quality media from YouTube, TikTok, Instagram, Twitter/X, Facebook, Snapchat, and Pinterest. 
                 Zero watermarks, 4K support, and completely secure.
             </p>
@@ -421,36 +421,36 @@
         </section>
 
         <!-- ── Result Area ── -->
-        <section id="result-area" class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 hidden animate-fade-in">
-            <div class="glass-card rounded-3xl p-6 md:p-8">
-                <div class="flex flex-col md:flex-row gap-8">
-                    <!-- Thumbnail -->
-                    <div class="w-full md:w-5/12 lg:w-1/3 relative group rounded-2xl overflow-hidden shadow-2xl flex-shrink-0 bg-white/5">
-                        <img id="res-thumb" src="" alt="Thumbnail" class="w-full h-full object-cover aspect-video group-hover:scale-105 transition-transform duration-500">
-                        <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <section id="result-area" class="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 mb-8 hidden animate-fade-in">
+            <div class="glass-card rounded-3xl p-4 sm:p-6 md:p-8">
+                <div class="flex flex-col md:flex-row gap-6 md:gap-8">
+                    <!-- Thumbnail (Fixed for vertical videos) -->
+                    <div class="w-full md:w-5/12 lg:w-1/3 relative group rounded-2xl overflow-hidden shadow-2xl flex-shrink-0 bg-white/5 flex items-center justify-center">
+                        <img id="res-thumb" src="" alt="Thumbnail" class="max-h-[300px] sm:max-h-[400px] w-auto object-contain group-hover:scale-105 transition-transform duration-500">
+                        <div class="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <div class="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
                                 <i class="fa-solid fa-play ml-1 text-white"></i>
                             </div>
                         </div>
-                        <div id="res-duration" class="absolute bottom-2 right-2 bg-black/75 backdrop-blur-sm px-2 py-0.5 rounded text-xs font-semibold text-white">--:--</div>
+                        <div id="res-duration" class="absolute bottom-2 right-2 bg-black/75 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-semibold text-white">--:--</div>
                     </div>
 
                     <!-- Info & Downloads -->
                     <div class="w-full flex flex-col">
                         <div class="mb-2">
-                            <span id="res-provider-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/5 border border-white/10 rounded-lg text-xs text-purple-400 font-medium">
-                                <i class="fa-solid fa-video"></i> Ready to Download
+                            <span id="res-provider-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/5 border border-white/10 rounded-lg text-xs text-purple-400 font-medium capitalize">
+                                <i class="fa-solid fa-video"></i> Ready
                             </span>
                         </div>
-                        <h3 id="res-title" class="text-xl md:text-2xl font-bold text-white mb-1 line-clamp-2">Loading…</h3>
-                        <p class="text-gray-500 text-sm mb-5">Choose your preferred format below</p>
+                        <h3 id="res-title" class="text-lg md:text-2xl font-bold text-white mb-1 line-clamp-2">Loading…</h3>
+                        <p class="text-gray-500 text-xs sm:text-sm mb-4">Choose your preferred format below</p>
 
-                        <h4 class="text-gray-300 text-sm font-semibold uppercase tracking-widest mb-3">Available Formats</h4>
-                        <div id="res-formats" class="space-y-3"></div>
+                        <h4 class="text-gray-300 text-[10px] sm:text-xs font-semibold uppercase tracking-widest mb-3">Available Formats</h4>
+                        <div id="res-formats" class="space-y-2.5"></div>
 
                         <!-- New Download button -->
-                        <button id="new-download-btn" class="mt-6 self-start flex items-center gap-2 text-sm text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl transition-all">
-                            <i class="fa-solid fa-arrow-left text-xs"></i> Download Another
+                        <button id="new-download-btn" class="mt-6 self-start flex items-center gap-2 text-xs text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl transition-all">
+                            <i class="fa-solid fa-arrow-left text-[10px]"></i> Download Another
                         </button>
                     </div>
                 </div>

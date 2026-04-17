@@ -93,8 +93,9 @@ h1, h2, h3, h4, h5, h6 {
 
 .reveal-hidden {
     opacity: 0;
-    transform: translateY(30px);
-    transition: all 0.8s var(--transition-smooth);
+    transform: translateY(20px);
+    transition: all 0.5s var(--transition-smooth);
+    will-change: transform, opacity;
 }
 
 .reveal-visible {

@@ -9,13 +9,23 @@ puppeteer.use(stealth());
 
 function findChromium() {
     const fs = require('fs');
-    for (const p of [
+    const isWin = process.platform === 'win32';
+    
+    const paths = isWin ? [
+        process.env.CHROMIUM_PATH,
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
+        'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+    ] : [
         process.env.CHROMIUM_PATH,
         '/usr/bin/chromium-browser',
         '/usr/bin/chromium',
         '/usr/bin/google-chrome-stable',
         '/usr/bin/google-chrome',
-    ]) {
+    ];
+
+    for (const p of paths) {
         if (p && fs.existsSync(p)) return p;
     }
     return undefined;
