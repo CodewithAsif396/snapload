@@ -9,4 +9,4 @@
  */
 // LOCAL:      window.ADS_BACKEND_URL = 'http://localhost:4000';
 // PRODUCTION: window.ADS_BACKEND_URL = 'https://ads.doomsdaysnap.online';
-window.ADS_BACKEND_URL = 'http://localhost:4000';
+window.ADS_BACKEND_URL = '';
