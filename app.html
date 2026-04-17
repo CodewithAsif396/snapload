@@ -960,7 +960,7 @@
             var badgeHtml = badge
                 ? '<span class="ml-2 text-[10px] py-0.5 px-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full text-white font-bold">' + badge + '</span>'
                 : '';
-            return '<div class="flex items-center justify-between glass-card p-4 rounded-2xl hover:bg-white/5 transition-all group/item">'
+            return '<div class="flex items-center justify-between glass-card p-3 sm:p-4 rounded-2xl hover:bg-white/5 transition-all group/item">'
                 + '<div class="flex items-center gap-4">'
                 + '<div class="w-11 h-11 rounded-xl bg-white/5 flex items-center justify-center ' + colorClass + ' group-hover/item:scale-110 transition-transform flex-shrink-0">'
                 + '<i class="fa-solid fa-' + iconName + '"></i>'
@@ -971,7 +971,7 @@
                 + '</div>'
                 + '</div>'
                 + '<a href="' + dlUrl + '" target="_blank" download'
-                + ' class="gradient-bg text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg hover:shadow-purple-500/20 active:scale-95 transition-all flex-shrink-0"'
+                + ' class="gradient-bg text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg hover:shadow-purple-500/20 active:scale-95 transition-all flex-shrink-0"'
                 + ' onclick="showToast(\'Download started!\',\'success\',2500)">'
                 + '<i class="fa-solid fa-arrow-down-long"></i><span>Download</span>'
                 + '</a>'

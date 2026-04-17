@@ -1013,6 +1013,11 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 '--merge-output-format', 'mp4'
             ];
 
+            // Add cookies if available
+            if (fs.existsSync(COOKIES_FILE)) {
+                extraArgs.push('--cookies', COOKIES_FILE);
+            }
+
             const cdnHeaders = {
                 'User-Agent': uaData.ua,
                 'Referer': referer,
