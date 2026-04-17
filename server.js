@@ -8,6 +8,7 @@ const { spawn }  = require('child_process');
 
 const { sanitizeUrl }    = require('./utils/sanitizer');
 const { getTikTokCdnUrl } = require('./utils/tiktokBrowser');
+const { getRandomUA }     = require('./utils/userAgent');
 
 const ffmpegPath = require('ffmpeg-static');
 
@@ -819,28 +820,6 @@ const TWITTER_ARGS = [
     '--add-header', 'origin:https://x.com',
     '--merge-output-format', 'mp4',
 ];
-// Facebook: realistic browser UA is required to access public video CDN URLs
-const FACEBOOK_ARGS = [
-    '--add-header', 'referer:https://www.facebook.com/',
-    '--add-header', 'origin:https://www.facebook.com',
-    '--add-header', 'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    '--merge-output-format', 'mp4',
-];
-// Snapchat: public Spotlight & story videos — referer needed for CDN access
-const SNAPCHAT_ARGS = [
-    '--add-header', 'referer:https://www.snapchat.com/',
-    '--add-header', 'origin:https://www.snapchat.com',
-    '--add-header', 'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    '--merge-output-format', 'mp4',
-];
-// Pinterest: video pins — referer + desktop UA for best yt-dlp extraction
-const PINTEREST_ARGS = [
-    '--add-header', 'referer:https://www.pinterest.com/',
-    '--add-header', 'origin:https://www.pinterest.com',
-    '--add-header', 'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    '--merge-output-format', 'mp4',
-];
-
 // ─── Direct-then-merge helper ─────────────────────────────────────────────────
 // Used for Instagram, Twitter, Facebook, Snapchat, Pinterest.
 // 1. Ask yt-dlp to resolve CDN URL(s) with --get-url (fast, no ffmpeg).
@@ -1017,21 +996,32 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 'Referer': 'https://x.com/',
             });
 
-        } else if (isFacebook) {
-            await tryDirectThenMerge(safeUrl, format, res, req, FACEBOOK_ARGS, {
-                'Referer':    'https://www.facebook.com/',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            });
+        } else if (isFacebook || isSnapchat || isPinterest) {
+            const uaData = getRandomUA();
+            const referer = isFacebook ? 'https://www.facebook.com/' : (isSnapchat ? 'https://www.snapchat.com/' : 'https://www.pinterest.com/');
+            
+            const extraArgs = [
+                '--user-agent', uaData.ua,
+                '--referer', referer,
+                '--add-header', `sec-ch-ua: ${uaData.clientHints}`,
+                '--add-header', `sec-ch-ua-mobile: ${uaData.mobile || '?0'}`,
+                '--add-header', `sec-ch-ua-platform: ${uaData.platform}`,
+                '--add-header', 'sec-fetch-dest: empty',
+                '--add-header', 'sec-fetch-mode: cors',
+                '--add-header', 'sec-fetch-site: same-origin',
+                '--add-header', `origin: ${referer}`,
+                '--merge-output-format', 'mp4'
+            ];
 
-        } else if (isSnapchat) {
-            await tryDirectThenMerge(safeUrl, format, res, req, SNAPCHAT_ARGS, {
-                'Referer': 'https://www.snapchat.com/',
-            });
+            const cdnHeaders = {
+                'User-Agent': uaData.ua,
+                'Referer': referer,
+                'Sec-CH-UA': uaData.clientHints,
+                'Sec-CH-UA-Mobile': uaData.mobile || '?0',
+                'Sec-CH-UA-Platform': uaData.platform
+            };
 
-        } else if (isPinterest) {
-            await tryDirectThenMerge(safeUrl, format, res, req, PINTEREST_ARGS, {
-                'Referer': 'https://www.pinterest.com/',
-            });
+            await tryDirectThenMerge(safeUrl, format, res, req, extraArgs, cdnHeaders);
 
         } else {
             console.log(`[DOWNLOAD] generic → yt-dlp stream`);

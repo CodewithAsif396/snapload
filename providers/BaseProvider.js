@@ -111,6 +111,8 @@ class BaseProvider {
     }
 
     async executeYtdlp(url, extraOpts = {}) {
+        const { userAgent, referer, ...otherOpts } = extraOpts;
+
         return new Promise((resolve, reject) => {
             const args = [
                 url,
@@ -123,10 +125,15 @@ class BaseProvider {
                 '--ffmpeg-location', ffmpegPath,
             ];
 
+            // Add standard Cookies if available
             if (COOKIES_ARG) args.push('--cookies', COOKIES_ARG);
 
-            // Append extra options converted to CLI flags
-            args.push(...toArgs(extraOpts));
+            // Add explicit UA/Referer flags (most effective against bots)
+            if (userAgent) args.push('--user-agent', userAgent);
+            if (referer)   args.push('--referer', referer);
+
+            // Append other extra options converted to CLI flags
+            args.push(...toArgs(otherOpts));
 
             const proc = spawn(YTDLP_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
             let out = '';
@@ -135,21 +142,29 @@ class BaseProvider {
             proc.stdout.on('data', d => out += d.toString());
             proc.stderr.on('data', d => {
                 const line = d.toString();
+                // Filter out progress lines to keep error log clean
                 if (!line.includes('[download]') && !line.includes('ETA')) err += line;
             });
 
             const timer = setTimeout(() => {
                 proc.kill('SIGKILL');
-                reject(new Error('yt-dlp timed out'));
-            }, 45000);
+                reject(new Error('yt-dlp timed out (extraction took too long)'));
+            }, 60000); // 60s timeout for heavy extractions
 
             proc.on('close', code => {
                 clearTimeout(timer);
                 if (code === 0 && out.trim()) {
                     try { resolve(JSON.parse(out)); }
-                    catch (e) { reject(new Error('Failed to parse yt-dlp JSON')); }
+                    catch (e) { reject(new Error('Failed to parse yt-dlp JSON results')); }
                 } else {
-                    reject(new Error(err.trim() || `yt-dlp exited with code ${code}`));
+                    const errorMsg = err.trim() || `yt-dlp exited with code ${code}`;
+                    
+                    // Specific bot detection discovery
+                    if (errorMsg.includes('Sign in to confirm you’re not a bot') || errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
+                        reject(new Error(`BOT_DETECTED: ${errorMsg}`));
+                    } else {
+                        reject(new Error(errorMsg));
+                    }
                 }
             });
 

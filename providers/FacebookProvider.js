@@ -1,28 +1,24 @@
-/**
- * FacebookProvider
- * ────────────────
- * Handles Facebook video and Reel downloads via yt-dlp.
- *
- * Notes:
- *   - Only public videos are supported (no login cookies provided).
- *   - A realistic browser User-Agent is required — Facebook blocks
- *     bot-like requests without it.
- *   - fb.watch short links are also supported.
- */
-
 const BaseProvider = require('./BaseProvider');
+const { getRandomUA } = require('../utils/userAgent');
 
 class FacebookProvider extends BaseProvider {
     async getInfo(url) {
+        const uaData = getRandomUA();
+        
         // Facebook CDN requires a real browser UA + referer to serve video metadata
         const output = await this.executeYtdlp(url, {
+            userAgent: uaData.ua,
+            referer: 'https://www.facebook.com/',
             addHeader: [
-                'referer:https://www.facebook.com/',
+                `sec-ch-ua: ${uaData.clientHints}`,
+                `sec-ch-ua-mobile: ${uaData.mobile || '?0'}`,
+                `sec-ch-ua-platform: ${uaData.platform}`,
+                'sec-fetch-dest: empty',
+                'sec-fetch-mode: cors',
+                'sec-fetch-site: same-origin',
                 'origin:https://www.facebook.com',
-                'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                'sec-ch-ua: "Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-                'sec-ch-ua-mobile: ?0',
-                'sec-ch-ua-platform: "Windows"',
+                'accept: */*',
+                'accept-language: en-US,en;q=0.9',
             ],
         });
 
