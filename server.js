@@ -837,12 +837,21 @@ app.post('/api/info', rateLimit, async (req, res) => {
             return res.status(400).json({ error: 'Please provide a valid video URL.' });
         }
         const safeUrl  = sanitizeUrl(url);
+        const isTikTok = safeUrl.includes('tiktok.com');
         const provider = getProvider(safeUrl);
         console.log(`[INFO] ${provider.constructor.name} → ${safeUrl}`);
         const info = await provider.getInfo(safeUrl);
 
+        // TikTok: replace compressed bitrateInfo formats with single Original Quality option
+        if (isTikTok) {
+            info.formats = [
+                { label: 'Original Quality', ext: 'mp4', height: 'original', size: null },
+            ];
+            info.audioFormats = info.audioFormats || [];
+        }
+
         // Pre-fetch CDN URL in background so /api/download is instant
-        setImmediate(() => preFetchCdnUrl(safeUrl, info).catch(() => {}));
+        if (!isTikTok) setImmediate(() => preFetchCdnUrl(safeUrl, info).catch(() => {}));
 
         return res.json({ ...info, originalUrl: url });
     } catch (err) {
@@ -988,43 +997,21 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 return;
             }
 
-            // ── VIDEO: real browser session only ──────────────────────────────
-            // Resolve short URL first (vt.tiktok.com → full URL)
-            const resolvedTikTokUrl = await new Promise((resolve) => {
-                if (!safeUrl.includes('vt.tiktok.com') && !safeUrl.includes('vm.tiktok.com')) return resolve(safeUrl);
-                const r = https.get(safeUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res2) => {
-                    res2.resume();
-                    if ([301, 302, 307, 308].includes(res2.statusCode) && res2.headers.location) {
-                        const loc = res2.headers.location;
-                        resolve(loc.startsWith('http') ? loc : `https://www.tiktok.com${loc}`);
-                    } else { resolve(safeUrl); }
-                });
-                r.on('error', () => resolve(safeUrl));
-                setTimeout(() => { r.destroy(); resolve(safeUrl); }, 6000);
-            });
-
-            console.log('[DOWNLOAD] TikTok → Puppeteer browser (original quality)');
-            const captured = await getTikTokCdnUrl(resolvedTikTokUrl).catch(err => {
-                console.error('[TikTokBrowser]', err.message);
-                return null;
-            });
-
-            if (captured?.url) {
-                const ok = await pipeCdnUrl(captured.url, res, req, captured.headers);
-                if (ok) return;
-                console.log('[DOWNLOAD] TikTok browser pipe failed — trying tikwm fallback');
-            }
-
-            // ── FALLBACK: tikwm task API (original quality _original.mp4) ────────
+            // ── VIDEO: tikwm task API → original quality _original.mp4 ──────────
+            console.log('[DOWNLOAD] TikTok → tikwm task API (original quality)');
             const tikwmOriginal = await (async () => {
                 try {
                     // Step 1: submit task
+                    const postData = `url=${encodeURIComponent(safeUrl)}&web=1`;
                     const submitRes = await new Promise((resolve) => {
-                        const postData = `url=${encodeURIComponent(safeUrl)}&web=1`;
                         const opts = {
                             hostname: 'www.tikwm.com', path: '/api/video/task/submit',
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(postData), 'User-Agent': 'Mozilla/5.0' },
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'Content-Length': Buffer.byteLength(postData),
+                                'User-Agent': 'Mozilla/5.0',
+                            },
                         };
                         const req2 = https.request(opts, (r) => {
                             let d = ''; r.on('data', c => d += c);
@@ -1033,27 +1020,41 @@ app.get('/api/download', rateLimit, async (req, res) => {
                         req2.on('error', () => resolve(null));
                         req2.write(postData); req2.end();
                     });
+                    console.log('[DOWNLOAD] tikwm submit:', JSON.stringify(submitRes)?.slice(0, 120));
                     if (submitRes?.code !== 0 || !submitRes?.data?.task_id) return null;
                     const taskId = submitRes.data.task_id;
-                    // Step 2: poll for result
-                    for (let i = 0; i < 12; i++) {
+                    // Step 2: poll for result (max 30s)
+                    for (let i = 0; i < 15; i++) {
                         await new Promise(r => setTimeout(r, 2000));
                         const result = await new Promise((resolve) => {
-                            https.get(`https://www.tikwm.com/api/video/task/result?task_id=${taskId}`, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r) => {
+                            https.get(`https://www.tikwm.com/api/video/task/result?task_id=${taskId}`,
+                                { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r) => {
                                 let d = ''; r.on('data', c => d += c);
                                 r.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve(null); } });
                             }).on('error', () => resolve(null));
                         });
                         if (result?.code === 0) {
-                            if (result.data.status === 2) return result.data.detail?.play_url || result.data.detail?.download_url || null;
-                            if (result.data.status === 3) return null;
+                            const status = result.data?.status;
+                            console.log(`[DOWNLOAD] tikwm poll ${i+1}: status=${status}`);
+                            if (status === 2) {
+                                const detail = result.data.detail;
+                                return detail?.play_url || detail?.download_url || null;
+                            }
+                            if (status === 3) return null;
                         }
                     }
-                } catch { return null; }
+                } catch (e) {
+                    console.error('[DOWNLOAD] tikwm task error:', e.message);
+                }
                 return null;
             })();
+
             if (tikwmOriginal) {
-                const ok = await pipeCdnUrl(tikwmOriginal, res, req, { 'Referer': 'https://www.tiktok.com/' });
+                console.log('[DOWNLOAD] tikwm original URL:', tikwmOriginal.slice(0, 100));
+                const ok = await pipeCdnUrl(tikwmOriginal, res, req, {
+                    'Referer': 'https://www.tiktok.com/',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                });
                 if (ok) return;
             }
 
@@ -1131,6 +1132,46 @@ app.get('/api/download', rateLimit, async (req, res) => {
         console.error('[DOWNLOAD Error]:', err.message);
         if (!res.headersSent) res.status(500).send('Download failed. Please try again.');
     }
+});
+
+// ─── TikTok Python proxy ──────────────────────────────────────────────────────
+// Forwards /tiktok and /get_video and /proxy to Python Flask on port 5000
+const FLASK_PORT = 5000;
+
+app.get('/tiktok', (req, res) => {
+    const opts = { hostname: '127.0.0.1', port: FLASK_PORT, path: '/', method: 'GET' };
+    const proxy = http.request(opts, (r) => {
+        res.writeHead(r.statusCode, r.headers);
+        r.pipe(res);
+    });
+    proxy.on('error', () => res.status(503).send('TikTok downloader is starting up, please try again in a moment.'));
+    proxy.end();
+});
+
+app.post('/get_video', (req, res) => {
+    const body = JSON.stringify(req.body);
+    const opts = {
+        hostname: '127.0.0.1', port: FLASK_PORT, path: '/get_video', method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    };
+    const proxy = http.request(opts, (r) => {
+        res.writeHead(r.statusCode, r.headers);
+        r.pipe(res);
+    });
+    proxy.on('error', () => res.status(503).json({ error: 'TikTok service unavailable' }));
+    proxy.write(body);
+    proxy.end();
+});
+
+app.get('/proxy', (req, res) => {
+    const qs = new URLSearchParams(req.query).toString();
+    const opts = { hostname: '127.0.0.1', port: FLASK_PORT, path: `/proxy?${qs}`, method: 'GET' };
+    const proxy = http.request(opts, (r) => {
+        res.writeHead(r.statusCode, r.headers);
+        r.pipe(res);
+    });
+    proxy.on('error', () => res.status(503).send('TikTok service unavailable'));
+    proxy.end();
 });
 
 app.listen(PORT, () => {
