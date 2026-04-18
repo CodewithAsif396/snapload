@@ -7,6 +7,59 @@ const http       = require('http');
 const { spawn }  = require('child_process');
 
 const { sanitizeUrl }    = require('./utils/sanitizer');
+
+// ─── Maintenance Mode ─────────────────────────────────────────────────────────
+const MAINTENANCE_FILE   = path.join(__dirname, 'maintenance.json');
+const MAINTENANCE_SECRET = process.env.MAINTENANCE_SECRET || 'dsadmin2024';
+
+function loadMaintenance() {
+    try { return JSON.parse(fs.readFileSync(MAINTENANCE_FILE, 'utf8')); }
+    catch { return { global: false, pages: {}, message: 'Down for maintenance.', estimatedTime: '' }; }
+}
+function saveMaintenance(data) {
+    fs.writeFileSync(MAINTENANCE_FILE, JSON.stringify(data, null, 2));
+}
+function isInMaintenance(pathname) {
+    const m = loadMaintenance();
+    if (m.global) return true;
+    return m.pages?.[pathname] === true;
+}
+function maintenancePage(message, estimatedTime) {
+    const eta = estimatedTime ? `<p class="eta">Estimated time: <strong>${estimatedTime}</strong></p>` : '';
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Under Maintenance — Doomsdaysnap</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f0f0f;color:#fff;font-family:'Segoe UI',sans-serif;text-align:center;padding:20px}
+  .card{max-width:480px;width:100%}
+  .icon{font-size:80px;margin-bottom:24px;animation:spin 3s linear infinite}
+  @keyframes spin{0%,100%{transform:rotate(0deg)}50%{transform:rotate(15deg)}75%{transform:rotate(-10deg)}}
+  h1{font-size:2rem;font-weight:800;margin-bottom:12px;background:linear-gradient(135deg,#a855f7,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  p{color:#9ca3af;line-height:1.6;margin-bottom:8px;font-size:1rem}
+  .eta{margin-top:16px;color:#d1d5db;font-size:.9rem}
+  .eta strong{color:#a855f7}
+  .back{display:inline-block;margin-top:28px;padding:12px 28px;background:linear-gradient(135deg,#7c3aed,#db2777);border-radius:12px;color:#fff;text-decoration:none;font-weight:600;font-size:.9rem;transition:opacity .2s}
+  .back:hover{opacity:.85}
+  .brand{margin-top:32px;color:#374151;font-size:.8rem}
+  .brand span{color:#6b7280}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">🔧</div>
+  <h1>Under Maintenance</h1>
+  <p>${message || 'We\'re upgrading our systems to serve you better.'}</p>
+  ${eta}
+  <a href="/" class="back">← Back to Home</a>
+  <p class="brand">Doomsdaysnap <span>· We'll be back soon</span></p>
+</div>
+</body>
+</html>`;
+}
 const { getTikTokCdnUrl } = require('./utils/tiktokBrowser');
 const { getRandomUA }     = require('./utils/userAgent');
 const { cobaltExtract }       = require('./utils/cobalt');
@@ -77,6 +130,51 @@ if (COOKIES_FILE) console.log('[Config] Cookies file:', COOKIES_FILE);
 app.use(cors());
 app.use(express.json({ limit: '10kb' }));
 app.use(express.static(path.join(__dirname)));
+
+// ─── Maintenance Middleware ───────────────────────────────────────────────────
+// Intercepts page requests (not API/asset) and shows maintenance page if enabled.
+app.use((req, res, next) => {
+    const p = req.path;
+    // Skip: API routes, static assets, admin, health check
+    if (p.startsWith('/api/') || p.startsWith('/admin/') || p.startsWith('/social/')
+        || p.startsWith('/proxy') || p.startsWith('/get_video')
+        || p.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|map|webp)$/)) {
+        return next();
+    }
+    const m = loadMaintenance();
+    const inMaintenance = m.global || m.pages?.[p] === true;
+    if (inMaintenance) {
+        return res.status(503).send(maintenancePage(m.message, m.estimatedTime));
+    }
+    next();
+});
+
+// ─── Admin: Maintenance Control API ──────────────────────────────────────────
+// GET  /admin/maintenance          → get full status
+// POST /admin/maintenance          → update (toggle pages / global / message)
+app.get('/admin/maintenance', (req, res) => {
+    if (req.query.secret !== MAINTENANCE_SECRET) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    res.json(loadMaintenance());
+});
+
+app.post('/admin/maintenance', (req, res) => {
+    const { secret, page, enabled, global: globalMode, message, estimatedTime } = req.body;
+    if (secret !== MAINTENANCE_SECRET) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const data = loadMaintenance();
+
+    if (typeof globalMode === 'boolean') data.global = globalMode;
+    if (page) data.pages[page] = enabled === true;
+    if (message !== undefined) data.message = message;
+    if (estimatedTime !== undefined) data.estimatedTime = estimatedTime;
+
+    saveMaintenance(data);
+    console.log(`[Maintenance] Updated:`, JSON.stringify(data));
+    res.json({ success: true, maintenance: data });
+});
 
 // ─── CDN URL Cache ─────────────────────────────────────────────────────────────
 // Pre-fetched during /api/info so /api/download can start instantly (no second yt-dlp call).
