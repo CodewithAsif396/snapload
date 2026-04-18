@@ -1015,25 +1015,46 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 console.log('[DOWNLOAD] TikTok browser pipe failed — trying tikwm fallback');
             }
 
-            // ── FALLBACK: tikwm hdplay (if browser fails) ─────────────────────
-            const tikwmVideo = await new Promise((resolve) => {
-                const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(safeUrl)}&hd=1`;
-                https.get(apiUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r) => {
-                    let d = ''; r.on('data', c => d += c);
-                    r.on('end', () => { try { const j = JSON.parse(d); resolve(j?.code === 0 ? j.data : null); } catch { resolve(null); } });
-                }).on('error', () => resolve(null));
-            });
-            if (tikwmVideo) {
-                const cdnUrl = tikwmVideo.hdplay || tikwmVideo.play;
-                if (cdnUrl) {
-                    const ok = await pipeCdnUrl(cdnUrl, res, req, { 'Referer': 'https://www.tiktok.com/' });
-                    if (ok) return;
-                }
-                if (tikwmVideo.id) {
-                    const direct = `https://www.tikwm.com/video/media/hdplay/${tikwmVideo.id}.mp4`;
-                    const ok = await pipeCdnUrl(direct, res, req, { 'Referer': 'https://www.tikwm.com/' });
-                    if (ok) return;
-                }
+            // ── FALLBACK: tikwm task API (original quality _original.mp4) ────────
+            const tikwmOriginal = await (async () => {
+                try {
+                    // Step 1: submit task
+                    const submitRes = await new Promise((resolve) => {
+                        const postData = `url=${encodeURIComponent(safeUrl)}&web=1`;
+                        const opts = {
+                            hostname: 'www.tikwm.com', path: '/api/video/task/submit',
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(postData), 'User-Agent': 'Mozilla/5.0' },
+                        };
+                        const req2 = https.request(opts, (r) => {
+                            let d = ''; r.on('data', c => d += c);
+                            r.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve(null); } });
+                        });
+                        req2.on('error', () => resolve(null));
+                        req2.write(postData); req2.end();
+                    });
+                    if (submitRes?.code !== 0 || !submitRes?.data?.task_id) return null;
+                    const taskId = submitRes.data.task_id;
+                    // Step 2: poll for result
+                    for (let i = 0; i < 12; i++) {
+                        await new Promise(r => setTimeout(r, 2000));
+                        const result = await new Promise((resolve) => {
+                            https.get(`https://www.tikwm.com/api/video/task/result?task_id=${taskId}`, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r) => {
+                                let d = ''; r.on('data', c => d += c);
+                                r.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve(null); } });
+                            }).on('error', () => resolve(null));
+                        });
+                        if (result?.code === 0) {
+                            if (result.data.status === 2) return result.data.detail?.play_url || result.data.detail?.download_url || null;
+                            if (result.data.status === 3) return null;
+                        }
+                    }
+                } catch { return null; }
+                return null;
+            })();
+            if (tikwmOriginal) {
+                const ok = await pipeCdnUrl(tikwmOriginal, res, req, { 'Referer': 'https://www.tiktok.com/' });
+                if (ok) return;
             }
 
             if (!res.headersSent) res.status(500).send('TikTok video download failed. Try again.');
