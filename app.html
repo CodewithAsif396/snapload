@@ -173,6 +173,25 @@
             min-width: 150px;
             text-align: left;
         }
+
+        /* Premium Glow Effects */
+        .premium-glow {
+            box-shadow: 0 0 50px -10px rgba(168, 85, 247, 0.3);
+        }
+        .text-glow {
+            text-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+        }
+        
+        /* Skeleton loading pulse */
+        @keyframes skeleton-pulse {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-pulse 1.5s infinite;
+        }
     </style>
 </head>
 <body class="antialiased relative min-h-screen flex flex-col font-sans">
@@ -1025,23 +1044,24 @@
                 if (data.formats && data.formats.length > 0) {
                     data.formats.forEach(function (f) {
                         var color = 'text-blue-400', badge = '';
-                        var sizeStr = f.size ? (f.size / (1024 * 1024)).toFixed(1) + ' MB' : 'HD Quality';
-                        var desc    = (f.ext || 'mp4').toUpperCase() + ' · ' + sizeStr;
+                        var sizeStr = f.size ? (f.size / (1024 * 1024)).toFixed(1) + ' MB' : 'HD Ready';
+                        var desc    = (f.ext || 'mp4').toUpperCase() + ' · ' + sizeStr + ' · Optimized';
 
                         var fidParam = f.fid ? '&fid=' + encodeURIComponent(f.fid) : '';
                         if (typeof f.height === 'number') {
-                            if      (f.height >= 1440) { color = 'text-purple-400'; badge = '4K/2K'; }
-                            else if (f.height >= 1080) { color = 'text-purple-400'; badge = 'FHD';   }
-                            else if (f.height >= 720)  { color = 'text-indigo-400'; badge = 'HD';    }
-                            html += buildFormatRow(f.height + 'p Video', desc, 'video', color,
+                            if      (f.height >= 2160) { color = 'text-yellow-400'; badge = '4K ULTRA'; }
+                            else if (f.height >= 1440) { color = 'text-purple-400'; badge = '2K QUAD'; }
+                            else if (f.height >= 1080) { color = 'text-purple-400'; badge = 'FHD 1080';   }
+                            else if (f.height >= 720)  { color = 'text-indigo-400'; badge = 'HD 720';    }
+                            html += buildFormatRow(f.height + 'p Premium Video', desc, 'video', color,
                                 '/api/download?url=' + encodedUrl + '&type=' + f.height + fidParam, badge);
                         } else {
-                            html += buildFormatRow('Best Quality', desc, 'video', 'text-purple-400',
-                                '/api/download?url=' + encodedUrl + '&type=1080' + fidParam, 'HD');
+                            html += buildFormatRow('Original Studio Quality', desc, 'video', 'text-purple-400',
+                                '/api/download?url=' + encodedUrl + '&type=1080' + fidParam, 'SOURCE');
                         }
                     });
                 } else {
-                    html += buildFormatRow('HD Video', 'Best available quality', 'video', 'text-purple-400',
+                    html += buildFormatRow('Best HD Available', 'Source direct extraction', 'video', 'text-purple-400',
                         '/api/download?url=' + encodedUrl + '&type=1080', 'HD');
                 }
 

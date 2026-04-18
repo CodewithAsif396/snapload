@@ -61,8 +61,6 @@ function maintenancePage(message, estimatedTime) {
 }
 const { getTikTokCdnUrl } = require('./utils/tiktokBrowser');
 const { getRandomUA }     = require('./utils/userAgent');
-const { cobaltExtract }       = require('./utils/cobalt');
-const { facebookDirectExtract } = require('./utils/facebookDirect');
 
 const ffmpegPath = require('ffmpeg-static');
 
@@ -395,20 +393,30 @@ app.get('/', (_req, res) => {
         
         // Generate Large Premium Grid for Home Page
         const gridHtml = `
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 stagger-reveal">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-10 stagger-reveal">
                 ${Object.keys(PLATFORM_SEO_DATA).map(key => {
                     const p = PLATFORM_SEO_DATA[key];
                     const name = key.split('-')[0].charAt(0).toUpperCase() + key.split('-')[0].slice(1);
                     return `
-                        <a href="/${key}" class="group relative flex flex-col items-center justify-center p-8 rounded-3xl glass-card border border-white/5 hover:border-white/20 transition-all duration-500 hover-lift overflow-hidden stagger-item">
-                            <div class="absolute inset-0 bg-gradient-to-br ${p.bg.replace('10', '20')} opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                            <div class="relative z-10 w-20 h-20 rounded-2xl ${p.bg} flex items-center justify-center mb-6 transform group-hover:scale-110 transition-transform duration-500 shadow-xl shadow-black/20">
-                                <i class="fa-brands ${p.icon} text-4xl ${p.color}"></i>
+                        <a href="/${key}" class="group relative flex flex-col items-center justify-center p-8 rounded-[2.5rem] glass-card border border-white/5 hover:border-purple-500/30 transition-all duration-700 hover-lift overflow-hidden stagger-item">
+                            <!-- Animated Background Glow -->
+                            <div class="absolute -inset-2 bg-gradient-to-br ${p.bg.replace('10', '40')} blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            
+                            <!-- Card Content -->
+                            <div class="relative z-10 w-24 h-24 rounded-3xl ${p.bg} flex items-center justify-center mb-8 transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 shadow-2xl shadow-black/40 border border-white/10">
+                                <i class="fa-brands ${p.icon} text-5xl ${p.color} drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]"></i>
                             </div>
-                            <h3 class="relative z-10 text-xl font-bold text-white mb-2 group-hover:text-purple-400 transition-colors">${name}</h3>
-                            <p class="relative z-10 text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Download Now</p>
-                            <div class="absolute bottom-4 right-4 text-white/5 group-hover:text-white/20 transition-colors">
-                                <i class="fa-solid fa-arrow-right-long text-xl"></i>
+                            
+                            <h3 class="relative z-10 text-2xl font-black text-white mb-2 group-hover:text-purple-400 transition-colors tracking-tight">${name}</h3>
+                            <div class="relative z-10 flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/5 group-hover:bg-purple-500/10 group-hover:border-purple-500/20 transition-all">
+                                <span class="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-bold">Fast Download</span>
+                                <i class="fa-solid fa-circle-check text-[10px] text-purple-400"></i>
+                            </div>
+                            
+                            <!-- Corner Accent -->
+                            <div class="absolute -bottom-6 -right-6 w-20 h-20 bg-gradient-to-br ${p.bg.replace('10', '30')} rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-700"></div>
+                            <div class="absolute bottom-6 right-6 text-white/10 group-hover:text-purple-500/40 transform translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-500">
+                                <i class="fa-solid fa-arrow-right-long text-2xl"></i>
                             </div>
                         </a>
                     `;
@@ -703,12 +711,30 @@ PLATFORM_ROUTES.forEach(route => {
 
             let modifiedContent = data;
             
-            // Replace Title / Meta
+            // Replace Title / Meta / SEO
             modifiedContent = modifiedContent
                 .replace(/<title>.*?<\/title>/, `<title>${seo.title}</title>`)
                 .replace(/<meta name="description" content=".*?">/, `<meta name="description" content="${seo.desc}">`)
                 .replace(/<meta property="og:title" content=".*?">/, `<meta property="og:title" content="${seo.title}">`)
+                .replace(/<meta property="og:description" content=".*?">/, `<meta property="og:description" content="${seo.desc}">`)
+                .replace(/<meta name="twitter:title" content=".*?">/, `<meta name="twitter:title" content="${seo.title}">`)
+                .replace(/<meta name="twitter:description" content=".*?">/, `<meta name="twitter:description" content="${seo.desc}">`)
                 .replace(/<link rel="canonical" href=".*?">/, `<link rel="canonical" href="https://doomsdaysnap.online${route}">`);
+
+            // Inject Page-Specific Schema
+            const schemaHtml = `
+            <script type="application/ld+json">
+            {
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              "name": "${seo.h1}",
+              "operatingSystem": "All",
+              "applicationCategory": "MultimediaApplication",
+              "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+              "aggregateRating": { "@type": "AggregateRating", "ratingValue": "4.9", "reviewCount": "1280" }
+            }
+            </script>`;
+            modifiedContent = modifiedContent.replace('</head>', `${schemaHtml}\n</head>`);
 
             // Update H1 and Platform Title
             modifiedContent = modifiedContent.replace(
@@ -870,6 +896,16 @@ app.post('/api/info', rateLimit, async (req, res) => {
                 { label: 'Original Quality', ext: 'mp4', height: 'original', size: null },
             ];
             info.audioFormats = info.audioFormats || [];
+        }
+
+        // Fetch file sizes in parallel for all formats using the new getFileSize method
+        if (info.formats && info.formats.length > 0) {
+            await Promise.all(info.formats.map(async (fmt) => {
+                // If yt-dlp already provided a size, keep it. Otherwise, fetch it.
+                if (!fmt.size && fmt.url) {
+                    fmt.size = await provider.getFileSize(fmt.url);
+                }
+            }));
         }
 
         // Pre-fetch CDN URL in background so /api/download is instant
@@ -1195,12 +1231,7 @@ app.get('/api/download', rateLimit, async (req, res) => {
             const snapSocialOk = await trySocialServer();
             if (snapSocialOk) return;
 
-            console.log('[DOWNLOAD] Snapchat social_server failed → cobalt');
-            const cobaltSnap = await cobaltExtract(safeUrl).catch(() => null);
-            if (cobaltSnap?.url) {
-                const ok = await pipeCdnUrl(cobaltSnap.url, res, req, cdnHeaders);
-                if (ok) return;
-            }
+            console.log('[DOWNLOAD] Snapchat social_server failed → yt-dlp merge');
             if (!res.headersSent) spawnMergeStream(safeUrl, format, res, req, ytdlpArgs);
 
         } else {

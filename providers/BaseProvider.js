@@ -2,6 +2,8 @@ const { spawn }  = require('child_process');
 const ffmpegPath = require('ffmpeg-static');
 const fs         = require('fs');
 const path       = require('path');
+const http       = require('http');
+const https      = require('https');
 
 const isWin = process.platform === 'win32';
 
@@ -63,6 +65,25 @@ function toArgs(opts) {
 
 class BaseProvider {
     constructor() {}
+
+    /**
+     * Fetch Content-Length via HEAD request to determine file size without downloading.
+     * Uses native node http/https for speed.
+     */
+    async getFileSize(url) {
+        if (!url) return null;
+        return new Promise((resolve) => {
+            const lib = url.startsWith('https') ? https : http;
+            const req = lib.request(url, { method: 'HEAD', timeout: 5000 }, (res) => {
+                const size = parseInt(res.headers['content-length'], 10);
+                resolve(!isNaN(size) && size > 0 ? size : null);
+            });
+            req.on('error', () => resolve(null));
+            req.on('timeout', () => { req.destroy(); resolve(null); });
+            req.end();
+        });
+    }
+
 
     async getInfo(url) {
         throw new Error('getInfo must be implemented by subclass');
