@@ -1134,18 +1134,162 @@ app.get('/api/download', rateLimit, async (req, res) => {
     }
 });
 
-// ─── TikTok Python proxy ──────────────────────────────────────────────────────
-// Forwards /tiktok and /get_video and /proxy to Python Flask on port 5000
+// ─── TikTok Original Downloader Page ─────────────────────────────────────────
 const FLASK_PORT = 5000;
 
-app.get('/tiktok', (req, res) => {
-    const opts = { hostname: '127.0.0.1', port: FLASK_PORT, path: '/', method: 'GET' };
-    const proxy = http.request(opts, (r) => {
-        res.writeHead(r.statusCode, r.headers);
-        r.pipe(res);
+app.get('/tiktok-downloader', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TikTok Original Downloader — Doomsdaysnap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Inter','sans-serif']}}}}</script>
+<style>
+  html,body{overflow-x:hidden;background:#0f0f0f;color:#fff;font-family:'Inter',sans-serif}
+  .gradient-text{background:linear-gradient(135deg,#fe2c55,#ff6b35);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .glass{background:rgba(255,255,255,0.05);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1)}
+  .btn-primary{background:linear-gradient(135deg,#fe2c55,#ff4757);transition:all .3s}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(254,44,85,0.4)}
+  .btn-dl{background:linear-gradient(135deg,#00c853,#00e676);transition:all .3s}
+  .btn-dl:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,200,83,0.4)}
+  #spinner{display:none}
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<!-- Nav -->
+<nav class="glass sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+  <a href="/" class="flex items-center gap-2 text-xl font-bold">
+    <i class="fa-solid fa-bolt text-pink-500"></i>
+    <span class="gradient-text">Doomsdaysnap</span>
+  </a>
+  <a href="/" class="text-sm text-gray-400 hover:text-white transition">← Back to Home</a>
+</nav>
+
+<!-- Hero -->
+<main class="flex-1 flex flex-col items-center px-4 pt-16 pb-20">
+  <div class="text-center mb-10">
+    <div class="inline-flex items-center gap-2 bg-pink-500/10 border border-pink-500/30 rounded-full px-4 py-1.5 text-sm text-pink-400 mb-6">
+      <i class="fab fa-tiktok"></i> Original Quality · No Watermark
+    </div>
+    <h1 class="text-4xl md:text-5xl font-extrabold mb-4">
+      TikTok <span class="gradient-text">Original</span> Downloader
+    </h1>
+    <p class="text-gray-400 text-lg max-w-xl mx-auto">
+      Download TikTok videos in original source quality — same file the creator uploaded.
+    </p>
+  </div>
+
+  <!-- Input Box -->
+  <div class="w-full max-w-2xl glass rounded-2xl p-6 mb-8">
+    <div class="flex gap-3">
+      <div class="flex-1 flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4">
+        <i class="fab fa-tiktok text-pink-500 text-lg"></i>
+        <input id="urlInput" type="text" placeholder="Paste TikTok video URL here..."
+          class="flex-1 bg-transparent py-4 text-sm outline-none placeholder-gray-500"
+          onkeydown="if(event.key==='Enter')fetchVideo()">
+      </div>
+      <button onclick="fetchVideo()" class="btn-primary text-white font-semibold px-6 py-4 rounded-xl flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <span>Fetch Video</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Spinner -->
+  <div id="spinner" class="flex flex-col items-center gap-4 my-8">
+    <div class="w-12 h-12 border-4 border-pink-500/30 border-t-pink-500 rounded-full animate-spin"></div>
+    <p class="text-gray-400 text-sm">Fetching original quality... this may take 20-30 seconds</p>
+  </div>
+
+  <!-- Result -->
+  <div id="result" class="w-full max-w-2xl"></div>
+
+  <!-- How it works -->
+  <div class="w-full max-w-2xl mt-16 grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="glass rounded-xl p-5 text-center">
+      <div class="text-3xl mb-3">📋</div>
+      <h3 class="font-semibold mb-1">Paste URL</h3>
+      <p class="text-gray-400 text-sm">Copy any TikTok video link</p>
+    </div>
+    <div class="glass rounded-xl p-5 text-center">
+      <div class="text-3xl mb-3">⚡</div>
+      <h3 class="font-semibold mb-1">Fetch Video</h3>
+      <p class="text-gray-400 text-sm">We get the original source file</p>
+    </div>
+    <div class="glass rounded-xl p-5 text-center">
+      <div class="text-3xl mb-3">💾</div>
+      <h3 class="font-semibold mb-1">Download</h3>
+      <p class="text-gray-400 text-sm">Save in full original quality</p>
+    </div>
+  </div>
+</main>
+
+<script>
+async function fetchVideo() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) { showError('Please paste a TikTok URL first.'); return; }
+
+  document.getElementById('result').innerHTML = '';
+  document.getElementById('spinner').style.display = 'flex';
+
+  try {
+    const res = await fetch('/get_video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, session_id: '' })
     });
-    proxy.on('error', () => res.status(503).send('TikTok downloader is starting up, please try again in a moment.'));
-    proxy.end();
+    const data = await res.json();
+    document.getElementById('spinner').style.display = 'none';
+
+    if (data.error) { showError(data.error); return; }
+
+    const sizeTxt = data.size_mb && data.size_mb !== '?' ? data.size_mb + ' MB' : 'Original';
+    document.getElementById('result').innerHTML = \`
+      <div class="glass rounded-2xl p-6 animate-fade-in">
+        <div class="flex gap-5 items-start">
+          <img src="\${data.cover}" alt="cover" class="w-24 h-24 object-cover rounded-xl flex-shrink-0">
+          <div class="flex-1 min-w-0">
+            <h2 class="font-bold text-lg leading-snug mb-1 line-clamp-2">\${data.title || 'TikTok Video'}</h2>
+            <p class="text-gray-400 text-sm mb-1">@\${data.author || ''}</p>
+            <span class="inline-flex items-center gap-1.5 bg-pink-500/10 border border-pink-500/30 text-pink-400 text-xs rounded-full px-3 py-1">
+              <i class="fa-solid fa-star text-xs"></i> Original Quality · \${sizeTxt}
+            </span>
+          </div>
+        </div>
+        <div class="mt-5">
+          <a href="/proxy?url=\${encodeURIComponent(data.video_url)}&session="
+             class="btn-dl w-full flex items-center justify-center gap-2 text-white font-bold py-4 rounded-xl text-base"
+             download="tiktok_original.mp4">
+            <i class="fa-solid fa-download"></i>
+            Download Original MP4
+          </a>
+        </div>
+      </div>
+    \`;
+  } catch(e) {
+    document.getElementById('spinner').style.display = 'none';
+    showError('Something went wrong. Please try again.');
+  }
+}
+
+function showError(msg) {
+  document.getElementById('spinner').style.display = 'none';
+  document.getElementById('result').innerHTML = \`
+    <div class="glass border border-red-500/30 rounded-2xl p-5 text-center">
+      <i class="fa-solid fa-circle-exclamation text-red-400 text-2xl mb-3"></i>
+      <p class="text-red-400">\${msg}</p>
+    </div>
+  \`;
+}
+</script>
+</body>
+</html>`);
 });
 
 app.post('/get_video', (req, res) => {
