@@ -9,7 +9,8 @@ const { spawn }  = require('child_process');
 const { sanitizeUrl }    = require('./utils/sanitizer');
 const { getTikTokCdnUrl } = require('./utils/tiktokBrowser');
 const { getRandomUA }     = require('./utils/userAgent');
-const { cobaltExtract }   = require('./utils/cobalt');
+const { cobaltExtract }       = require('./utils/cobalt');
+const { facebookDirectExtract } = require('./utils/facebookDirect');
 
 const ffmpegPath = require('ffmpeg-static');
 
@@ -1142,10 +1143,19 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 });
             }
 
-            // ── Facebook: yt-dlp (with cookies) → social_server → cobalt ─────
+            // ── Facebook: direct scraper → yt-dlp → social_server → cobalt ──
             if (isFacebook) {
+                // Step 1: Node.js-native scrapers (snapsave, fdownloader, getfvid, savefrom, fdown) in parallel
+                console.log('[DOWNLOAD] Facebook → direct scrapers (parallel)');
+                const directUrl = await facebookDirectExtract(safeUrl).catch(() => null);
+                if (directUrl) {
+                    const ok = await pipeCdnUrl(directUrl, res, req, { 'Referer': 'https://www.facebook.com/' });
+                    if (ok) return;
+                    console.log('[DOWNLOAD] FB direct URL got but CDN rejected → continuing fallbacks');
+                }
+
+                // Step 2: yt-dlp --get-url with cookies
                 console.log('[DOWNLOAD] Facebook → yt-dlp with cookies');
-                // Try --get-url first (fast, direct CDN pipe)
                 const urls = await getDirectUrls(safeUrl, format, ytdlpArgs);
                 if (urls.length === 1) {
                     const ok = await pipeCdnUrl(urls[0], res, req, cdnHeaders);
@@ -1154,19 +1164,22 @@ app.get('/api/download', rateLimit, async (req, res) => {
                     spawnMergeStream(safeUrl, format, res, req, ytdlpArgs);
                     return;
                 }
-                // yt-dlp --get-url failed, try social_server
-                console.log('[DOWNLOAD] Facebook yt-dlp get-url failed → social_server');
+
+                // Step 3: social_server (Python fallback)
+                console.log('[DOWNLOAD] Facebook → social_server');
                 const socialOk = await trySocialServer();
                 if (socialOk) return;
-                // cobalt fallback
-                console.log('[DOWNLOAD] Facebook social_server failed → cobalt');
+
+                // Step 4: cobalt
+                console.log('[DOWNLOAD] Facebook → cobalt');
                 const cobalt = await cobaltExtract(safeUrl).catch(() => null);
                 if (cobalt?.url) {
                     const ok = await pipeCdnUrl(cobalt.url, res, req, cdnHeaders);
                     if (ok) return;
                 }
-                // absolute last resort - yt-dlp merge stream
-                console.log('[DOWNLOAD] Facebook cobalt failed → yt-dlp spawnMerge');
+
+                // Step 5: yt-dlp spawnMerge (absolute last resort)
+                console.log('[DOWNLOAD] Facebook → yt-dlp spawnMerge (last resort)');
                 if (!res.headersSent) spawnMergeStream(safeUrl, format, res, req, ytdlpArgs);
                 return;
             }
