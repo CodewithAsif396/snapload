@@ -73,7 +73,7 @@ const TikTokProvider   = require('./providers/TikTokProvider');
 const InstagramProvider = require('./providers/InstagramProvider');
 const TwitterProvider  = require('./providers/TwitterProvider');
 const FacebookProvider = require('./providers/FacebookProvider');
-const SocialProvider   = require('./providers/SocialProvider');   // Snapchat + Pinterest + generic
+const SocialProvider   = require('./providers/SocialProvider');   // Snapchat + generic
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -215,12 +215,12 @@ const providers = {
     instagram: new InstagramProvider(),
     twitter:   new TwitterProvider(),
     facebook:  new FacebookProvider(),
-    social:    new SocialProvider(),   // Snapchat + Pinterest + generic fallback
+    social:    new SocialProvider(),   // Snapchat + generic fallback
 };
 
 /**
  * Pick the right provider based on the URL domain.
- * Falls back to SocialProvider for Snapchat, Pinterest, and unknown URLs.
+ * Falls back to SocialProvider for Snapchat and unknown URLs.
  */
 function getProvider(url) {
     if (url.includes('youtube.com') || url.includes('youtu.be'))        return providers.youtube;
@@ -228,7 +228,7 @@ function getProvider(url) {
     if (url.includes('instagram.com'))                                   return providers.instagram;
     if (url.includes('x.com') || url.includes('twitter.com'))           return providers.twitter;
     if (url.includes('facebook.com') || url.includes('fb.watch'))       return providers.facebook;
-    return providers.social; // handles Snapchat, Pinterest, and any other URL
+    return providers.social; // handles Snapchat and any other URL
 }
 
 // ─── Build format string ──────────────────────────────────────────────────────
@@ -684,44 +684,6 @@ const PLATFORM_SEO_DATA = {
             { q: "Is it compatible with iOS?", a: "Yes, Safari on iOS 13+ supports direct downloads flawlessly." }
         ]
     },
-    'pinterest-downloader': {
-        title: 'Pinterest Video Downloader - Save Video Pins HD | Doomsdaysnap',
-        desc: 'Download Pinterest Video Pins in high resolution. The easiest way to save video content from Pinterest directly to your device.',
-        h1: 'Pinterest Video Downloader',
-        icon: 'fa-pinterest', color: 'text-red-500', border: 'border-t-red-500/40', bg: 'bg-red-500/10',
-        longContent: `
-            <div class="prose prose-invert max-w-none">
-                <p class="text-lg text-gray-300 leading-relaxed mb-6">
-                    Pinterest is the ultimate source of visual inspiration. With our Pinterest Video Downloader, you can save video pins for your mood boards, creative projects, or offline reference. We extract the direct MP4 links from Pinterest's global CDNs, bypassing the slower interface of the official app for a faster experience.
-                </p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 my-10">
-                    <div class="glass-card p-6 rounded-2xl border-l-4 border-red-500">
-                        <h3 class="text-xl font-bold mb-3 text-red-400">Vision Board Plus</h3>
-                        <p class="text-gray-400 text-sm">Download high-quality versions of tutorial and aesthetic video pins for offline inspiration boards.</p>
-                    </div>
-                </div>
-                 <p class="text-gray-400 leading-relaxed">
-                    Never lose track of a helpful Pin again. By saving the video directly to your storage, you can access your favorite Pinterest ideas even without an internet connection.
-                </p>
-            </div>
-        `,
-        steps: [
-            { icon: 'fa-copy', text: 'Copy Pin Link', desc: 'Tap the Share icon on any Video Pin and select Copy Link.' },
-            { icon: 'fa-image', text: 'Fetch Video', desc: 'Paste the Pinterest link above and we will grab the MP4 file.' },
-            { icon: 'fa-download', text: 'Download Pin', desc: 'Save the Pinterest video pin in full HD directly to your device.' }
-        ],
-        faqs: [
-            { q: "Can I save Pinterest Video Pins?", a: "Yes, any public video pin can be downloaded with our tool." },
-            { q: "Is it fast?", a: "Extremely. Most Pinterest videos are processed and ready in under 2 seconds." },
-            { q: "Is the quality good?", a: "Yes, we extract the highest bitrate MP4 resolution available for that pin." },
-            { q: "Does it work on tablet?", a: "Yes, it is fully responsive on all iPad and Android tablets." },
-            { q: "Are image pins supported?", a: "Currently, we focus on Video Pins to ensure the best extraction performance." },
-            { q: "Do I need an account?", a: "No, you can download public pins without even logging into Pinterest." },
-            { q: "Where are videos saved?", a: "Usually in your 'Downloads' folder, depending on your browser settings." },
-            { q: "Can I download from private boards?", a: "No, the tool must be able to 'see' the link publicly to fetch it." },
-            { q: "Is there any software to install?", a: "No, works straight in the browser with no extensions needed." }
-        ]
-    }
 };
 
 const PLATFORM_ROUTES = Object.keys(PLATFORM_SEO_DATA).map(key => `/${key}`);
@@ -869,23 +831,10 @@ app.get('/robots.txt', (_req, res) => {
 async function preFetchCdnUrl(safeUrl, info) {
     const isFB   = safeUrl.includes('facebook.com') || safeUrl.includes('fb.watch');
     const isSnap = safeUrl.includes('snapchat.com');
-    const isPin  = safeUrl.includes('pinterest.com') || safeUrl.includes('pin.it');
 
-    if (!isFB && !isSnap && !isPin) return; // only needed for slow platforms
+    if (!isFB && !isSnap) return; // only needed for slow platforms
 
-    const referer = isFB  ? 'https://www.facebook.com/'
-                  : isSnap ? 'https://www.snapchat.com/'
-                  : 'https://www.pinterest.com/';
-
-    // For Pinterest use cobalt (fast, no yt-dlp spawn needed)
-    if (isPin) {
-        const cobalt = await cobaltExtract(safeUrl).catch(() => null);
-        if (cobalt?.url) {
-            cdnCacheSet(safeUrl, [cobalt.url], { 'Referer': referer });
-            console.log('[Cache] Pinterest cobalt URL cached');
-        }
-        return;
-    }
+    const referer = isFB ? 'https://www.facebook.com/' : 'https://www.snapchat.com/';
 
     // For FB / Snapchat: run yt-dlp --get-url in background
     const extraArgs = ['--referer', referer, '--merge-output-format', 'mp4'];
@@ -941,7 +890,6 @@ app.post('/api/info', rateLimit, async (req, res) => {
         else if (m.includes('tiktok') || m.includes('TikTok'))   msg = 'Could not fetch TikTok video. The video may be private or region-restricted.'
         else if (m.includes('facebook') || m.includes('Facebook'))   msg = 'Could not fetch Facebook video. Only public videos are supported.'
         else if (m.includes('snapchat') || m.includes('Snapchat'))   msg = 'Could not fetch Snapchat video. Only public Spotlight/Story videos are supported.'
-        else if (m.includes('pinterest') || m.includes('Pinterest')) msg = 'Could not fetch Pinterest video. Make sure the pin contains a video.';
         return res.status(500).json({ error: msg, details: m.slice(0, 300) });
     }
 });
@@ -961,7 +909,7 @@ const TWITTER_ARGS = [
     '--merge-output-format', 'mp4',
 ];
 // ─── Direct-then-merge helper ─────────────────────────────────────────────────
-// Used for Instagram, Twitter, Facebook, Snapchat, Pinterest.
+// Used for Instagram, Twitter, Facebook, Snapchat.
 // 1. Ask yt-dlp to resolve CDN URL(s) with --get-url (fast, no ffmpeg).
 // 2. One URL  → pipe directly to client at full CDN speed.
 // 3. Two URLs → separate video+audio streams, merge via ffmpeg.
@@ -1007,7 +955,6 @@ app.get('/api/download', rateLimit, async (req, res) => {
     const isTwitter   = safeUrl.includes('x.com') || safeUrl.includes('twitter.com');
     const isFacebook  = safeUrl.includes('facebook.com') || safeUrl.includes('fb.watch');
     const isSnapchat  = safeUrl.includes('snapchat.com') || safeUrl.includes('t.snapchat.com');
-    const isPinterest = safeUrl.includes('pinterest.com') || safeUrl.includes('pin.it');
 
     // Build format selector — prefer exact fid over height guess
     // TikTok uses combined stream selector (video+audio in one file)
@@ -1149,11 +1096,9 @@ app.get('/api/download', rateLimit, async (req, res) => {
                 'Referer': 'https://x.com/',
             });
 
-        } else if (isFacebook || isSnapchat || isPinterest) {
+        } else if (isFacebook || isSnapchat) {
             const uaData  = getRandomUA();
-            const referer = isFacebook ? 'https://www.facebook.com/'
-                          : isSnapchat ? 'https://www.snapchat.com/'
-                          : 'https://www.pinterest.com/';
+            const referer = isFacebook ? 'https://www.facebook.com/' : 'https://www.snapchat.com/';
 
             const ytdlpArgs = [
                 '--user-agent', uaData.ua,
@@ -1165,17 +1110,6 @@ app.get('/api/download', rateLimit, async (req, res) => {
             ];
             if (COOKIES_FILE) ytdlpArgs.push('--cookies', COOKIES_FILE);
             const cdnHeaders = { 'User-Agent': uaData.ua, 'Referer': referer };
-
-            // ── Pinterest ─────────────────────────────────────────────────────
-            if (isPinterest) {
-                const cobalt = await cobaltExtract(safeUrl).catch(() => null);
-                if (cobalt?.url) {
-                    const ok = await pipeCdnUrl(cobalt.url, res, req, cdnHeaders);
-                    if (ok) return;
-                }
-                spawnMergeStream(safeUrl, format, res, req, ytdlpArgs);
-                return;
-            }
 
             const platform = isFacebook ? 'facebook' : 'snapchat';
 
@@ -1464,7 +1398,7 @@ app.get('/proxy', (req, res) => {
     proxy.end();
 });
 
-// ─── Social Python proxy (Facebook/Snapchat/Pinterest) ───────────────────────
+// ─── Social Python proxy (Facebook/Snapchat) ─────────────────────────────────
 const SOCIAL_PORT = 5001;
 
 app.post('/social/download', (req, res) => {
