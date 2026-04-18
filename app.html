@@ -217,7 +217,6 @@
                             <a href="/twitter-downloader"   class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors"><i class="fa-brands fa-x-twitter text-white w-4"></i> Twitter/X Downloader</a>
                             <a href="/facebook-downloader"  class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors"><i class="fa-brands fa-facebook text-blue-400 w-4"></i> Facebook Downloader</a>
                             <a href="/snapchat-downloader"  class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors"><i class="fa-brands fa-snapchat text-yellow-300 w-4"></i> Snapchat Downloader</a>
-                            <a href="/pinterest-downloader" class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors"><i class="fa-brands fa-pinterest text-red-500 w-4"></i> Pinterest Downloader</a>
                         </div>
                     </div>
                     <a href="#how-it-works" class="text-gray-400 hover:text-white text-sm font-medium transition-colors">How It Works</a>
@@ -243,7 +242,6 @@
                 <a href="/twitter-downloader"   class="mobile-link flex items-center gap-3 px-3 py-3 rounded-xl text-gray-300 hover:text-white hover:bg-white/5 transition-colors"><i class="fa-brands fa-x-twitter text-white w-5 text-center"></i> Twitter/X Downloader</a>
                 <a href="/facebook-downloader"  class="mobile-link flex items-center gap-3 px-3 py-3 rounded-xl text-gray-300 hover:text-white hover:bg-white/5 transition-colors"><i class="fa-brands fa-facebook text-blue-400 w-5 text-center"></i> Facebook Downloader</a>
                 <a href="/snapchat-downloader"  class="mobile-link flex items-center gap-3 px-3 py-3 rounded-xl text-gray-300 hover:text-white hover:bg-white/5 transition-colors"><i class="fa-brands fa-snapchat text-yellow-300 w-5 text-center"></i> Snapchat Downloader</a>
-                <a href="/pinterest-downloader" class="mobile-link flex items-center gap-3 px-3 py-3 rounded-xl text-gray-300 hover:text-white hover:bg-white/5 transition-colors"><i class="fa-brands fa-pinterest text-red-500 w-5 text-center"></i> Pinterest Downloader</a>
                 <div class="h-px bg-white/5 my-1"></div>
                 <a href="#how-it-works" class="mobile-link flex items-center gap-3 px-3 py-3 rounded-xl text-gray-300 hover:text-white hover:bg-white/5 transition-colors">
                     <i class="fa-solid fa-circle-info w-5 text-center text-purple-400"></i> How It Works
@@ -330,11 +328,6 @@
                             <span class="text-[9px] leading-none">SC</span>
                         </button>
 
-                        <!-- Pinterest -->
-                        <button class="platform-tab relative z-10 flex-shrink-0 flex-1 min-w-[72px] flex flex-col items-center justify-center gap-0.5 py-2.5 px-2 text-gray-400 font-semibold transition-colors duration-200" data-platform="pinterest" data-index="6" style="scroll-snap-align:start">
-                            <i class="fa-brands fa-pinterest text-base"></i>
-                            <span class="text-[9px] leading-none">PIN</span>
-                        </button>
                     </div>
                 </div>
             </div>
@@ -657,7 +650,6 @@
             'twitter-downloader':   'twitter',
             'facebook-downloader':  'facebook',
             'snapchat-downloader':  'snapchat',
-            'pinterest-downloader': 'pinterest',
         };
         var pathSlug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
         var pathPlatform = pathPlatformMap[pathSlug];
@@ -673,7 +665,6 @@
                     'twitter':   'Twitter Video<br><span class="gradient-text">Downloader</span>',
                     'facebook':  'Facebook Video<br><span class="gradient-text">Downloader</span>',
                     'snapchat':  'Snapchat Tool<br><span class="gradient-text">Downloader</span>',
-                    'pinterest': 'Pinterest Tool<br><span class="gradient-text">Downloader</span>',
                 };
                 if (toolNames[pathPlatform]) {
                     mainTitle.innerHTML = toolNames[pathPlatform];
@@ -742,15 +733,6 @@
                 shadow: 'shadow-yellow-400/25',
                 sample: ''
             },
-            // Pinterest: video pins from pinterest.com or pin.it short links
-            pinterest: {
-                placeholder: 'Paste Pinterest Video Pin link…',
-                icon:   'fa-brands fa-pinterest',
-                color:  'from-red-600 to-rose-500',
-                glow:   'from-red-600 to-rose-500',
-                shadow: 'shadow-red-500/25',
-                sample: ''
-            }
         };
 
         // ── Switch Tab ───────────────────────────────────────────────────────
@@ -841,7 +823,6 @@
             if (url.includes('x.com') || url.includes('twitter.com'))           return 'twitter';
             if (url.includes('facebook.com') || url.includes('fb.watch'))       return 'facebook';
             if (url.includes('snapchat.com') || url.includes('t.snapchat.com')) return 'snapchat';
-            if (url.includes('pinterest.com') || url.includes('pin.it'))        return 'pinterest';
             return null;
         }
 
@@ -1032,7 +1013,6 @@
                     twitter:   'fa-x-twitter',
                     facebook:  'fa-facebook',
                     snapchat:  'fa-snapchat',
-                    pinterest: 'fa-pinterest',
                 };
                 var pIcon = providerIcons[data.provider] || 'fa-video';
                 document.getElementById('res-provider-badge').innerHTML =
@@ -1107,7 +1087,7 @@
         // ── Animated Text Cycle ──────────────────────────────────────────────
         const cycleElement = document.getElementById('platform-cycle');
         if (cycleElement) {
-            const platforms = ['YouTube', 'TikTok', 'Instagram', 'Twitter/X', 'Facebook', 'Snapchat', 'Pinterest'];
+            const platforms = ['YouTube', 'TikTok', 'Instagram', 'Twitter/X', 'Facebook', 'Snapchat'];
             let currentIdx = 0;
             
             setInterval(() => {

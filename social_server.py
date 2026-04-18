@@ -12,7 +12,40 @@ HEADERS = {
 # ─── FACEBOOK ────────────────────────────────────────────────────────────────
 
 def fetch_facebook(url):
-    """Use fdown.net to extract Facebook video URL"""
+    """Extract Facebook video URL directly from page HTML"""
+    try:
+        clean_url = url.replace("m.facebook.com", "www.facebook.com")
+        r = requests.get(
+            clean_url,
+            headers={
+                **HEADERS,
+                "Accept-Language": "en-US,en;q=0.9",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-Mode": "navigate",
+            },
+            timeout=20
+        )
+        html = r.text
+
+        # Try HD first
+        hd = re.search(r'"hd_src_no_ratelimit"\s*:\s*"([^"]+)"', html)
+        if not hd:
+            hd = re.search(r'"hd_src"\s*:\s*"([^"]+)"', html)
+        sd = re.search(r'"sd_src_no_ratelimit"\s*:\s*"([^"]+)"', html)
+        if not sd:
+            sd = re.search(r'"sd_src"\s*:\s*"([^"]+)"', html)
+
+        match = hd or sd
+        if match:
+            video_url = match.group(1).replace("\\u0026", "&").replace("\\/", "/")
+            quality = "HD" if hd else "SD"
+            print(f"[Facebook] Found {quality} URL from page")
+            return {"video_url": video_url, "title": "Facebook Video", "platform": "facebook"}
+
+    except Exception as e:
+        print(f"[Facebook] page scrape error: {e}")
+
+    # Fallback: fdown.net
     try:
         r = requests.post(
             "https://fdown.net/download.php",
@@ -21,29 +54,32 @@ def fetch_facebook(url):
             timeout=15
         )
         html = r.text
-        # Extract HD link first, then SD
         hd = re.search(r'href="(https://[^"]+\.mp4[^"]*)"[^>]*>\s*HD', html, re.IGNORECASE)
         sd = re.search(r'href="(https://[^"]+\.mp4[^"]*)"[^>]*>\s*SD', html, re.IGNORECASE)
-        video_url = (hd or sd)
-        if video_url:
-            return {"video_url": video_url.group(1), "title": "Facebook Video", "platform": "facebook"}
+        match = hd or sd
+        if match:
+            print("[Facebook] fdown.net success")
+            return {"video_url": match.group(1), "title": "Facebook Video", "platform": "facebook"}
     except Exception as e:
         print(f"[Facebook] fdown.net error: {e}")
 
-    # Fallback: getfvid.com
+    # Fallback 2: savefrom.net worker
     try:
-        r = requests.post(
-            "https://getfvid.com/downloader",
-            data={"url": url, "action": "post"},
-            headers={**HEADERS, "Referer": "https://getfvid.com/"},
+        r = requests.get(
+            f"https://worker.sf-tools.com/savefrom.php?sf_url={requests.utils.quote(url)}&new=1",
+            headers={**HEADERS, "Referer": "https://en.savefrom.net/"},
             timeout=15
         )
-        html = r.text
-        hd = re.search(r'"(https://[^"]+fbcdn[^"]+\.mp4[^"]*)"', html)
-        if hd:
-            return {"video_url": hd.group(1), "title": "Facebook Video", "platform": "facebook"}
+        data = r.json()
+        links = data.get("url", [])
+        if links:
+            best = sorted(links, key=lambda x: int(x.get("id", 0)), reverse=True)
+            video_url = best[0].get("url", "")
+            if video_url:
+                print("[Facebook] savefrom success")
+                return {"video_url": video_url, "title": data.get("meta", {}).get("title", "Facebook Video"), "platform": "facebook"}
     except Exception as e:
-        print(f"[Facebook] getfvid error: {e}")
+        print(f"[Facebook] savefrom error: {e}")
 
     return None
 
@@ -51,79 +87,58 @@ def fetch_facebook(url):
 # ─── SNAPCHAT ────────────────────────────────────────────────────────────────
 
 def fetch_snapchat(url):
-    """Use snapsave.app to extract Snapchat video URL"""
+    """Direct Snapchat page scrape — no watermark"""
     try:
-        r = requests.post(
-            "https://snapsave.app/action.php",
-            data={"url": url, "lang": "en", "plat": "desktop"},
-            headers={**HEADERS, "Referer": "https://snapsave.app/"},
-            timeout=15
+        r = requests.get(
+            url,
+            headers={
+                **HEADERS,
+                "Referer": "https://www.snapchat.com/",
+                "Accept-Language": "en-US,en;q=0.9",
+            },
+            allow_redirects=True,
+            timeout=20
         )
-        data = r.json()
-        if data.get("status") and data.get("data"):
-            for item in data["data"]:
-                if item.get("type") == "video" and item.get("url"):
-                    return {"video_url": item["url"], "title": "Snapchat Video", "platform": "snapchat"}
-    except Exception as e:
-        print(f"[Snapchat] snapsave error: {e}")
+        html = r.text
 
-    # Fallback: snapinsta style scrape
-    try:
-        r = requests.get(url, headers={**HEADERS, "Referer": "https://www.snapchat.com/"}, timeout=15)
-        # Snapchat Spotlight videos have playback URL in page JSON
-        match = re.search(r'"playbackUrl"\s*:\s*"(https://[^"]+)"', r.text)
-        if not match:
-            match = re.search(r'"snapMediaType"\s*:\s*"VIDEO"[^}]*"mediaUrl"\s*:\s*"(https://[^"]+)"', r.text)
+        # Method 1: playbackUrl in page JSON
+        match = re.search(r'"playbackUrl"\s*:\s*"(https://[^"]+)"', html)
         if match:
             video_url = match.group(1).replace("\\u0026", "&")
+            print("[Snapchat] Found via playbackUrl")
             return {"video_url": video_url, "title": "Snapchat Video", "platform": "snapchat"}
-    except Exception as e:
-        print(f"[Snapchat] direct scrape error: {e}")
 
-    return None
-
-
-# ─── PINTEREST ───────────────────────────────────────────────────────────────
-
-def fetch_pinterest(url):
-    """Use cobalt.tools or direct page scrape for Pinterest"""
-    # Try cobalt.tools instances
-    cobalt_instances = [
-        "https://api.cobalt.tools/",
-        "https://cobalt.privacydev.net/",
-        "https://cobalt.api.timelessnesses.me/",
-    ]
-    for api in cobalt_instances:
-        try:
-            r = requests.post(
-                api,
-                json={"url": url, "videoQuality": "1080", "filenameStyle": "basic"},
-                headers={**HEADERS, "Accept": "application/json"},
-                timeout=12
-            )
-            data = r.json()
-            status = data.get("status")
-            if status in ("stream", "tunnel", "redirect") and data.get("url"):
-                return {"video_url": data["url"], "title": "Pinterest Video", "platform": "pinterest"}
-            if status == "picker" and data.get("picker"):
-                return {"video_url": data["picker"][0]["url"], "title": "Pinterest Video", "platform": "pinterest"}
-        except Exception as e:
-            print(f"[Pinterest] cobalt {api} error: {e}")
-
-    # Fallback: direct page scrape for pinimg.com URL
-    try:
-        # Resolve short URL
-        r = requests.get(url, headers=HEADERS, allow_redirects=True, timeout=15)
-        html = r.text
-        # Look for video URL in page JSON
-        match = re.search(r'"url"\s*:\s*"(https://v[^"]+pinimg\.com[^"]+\.mp4[^"]*)"', html)
-        if not match:
-            match = re.search(r'(https://v\d+\.pinimg\.com/videos/[^"\'>\s]+\.mp4)', html)
+        # Method 2: snapchat CDN URL pattern
+        match = re.search(r'(https://cf-st\.sc-cdn\.net/[^"\'>\s]+\.mp4[^"\'>\s]*)', html)
         if match:
-            video_url = match.group(1).replace("\\u002F", "/")
-            return {"video_url": video_url, "title": "Pinterest Video", "platform": "pinterest"}
+            video_url = match.group(1).replace("\\u0026", "&")
+            print("[Snapchat] Found via sc-cdn.net")
+            return {"video_url": video_url, "title": "Snapchat Video", "platform": "snapchat"}
+
+        # Method 3: extract from JSON-LD or __NEXT_DATA__
+        next_data = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
+        if next_data:
+            try:
+                data = json.loads(next_data.group(1))
+                # Walk the JSON looking for video URLs
+                text = json.dumps(data)
+                cdn = re.search(r'(https://cf-st\.sc-cdn\.net/[^"\\]+\.mp4)', text)
+                if cdn:
+                    video_url = cdn.group(1)
+                    print("[Snapchat] Found via __NEXT_DATA__")
+                    return {"video_url": video_url, "title": "Snapchat Video", "platform": "snapchat"}
+            except Exception:
+                pass
+
+        # Method 4: any .mp4 from snapchat CDN
+        match = re.search(r'"(https://[^"]*sc-cdn\.net[^"]+\.mp4[^"]*)"', html)
+        if match:
+            video_url = match.group(1).replace("\\u0026", "&").replace("\\/", "/")
+            print("[Snapchat] Found via sc-cdn fallback")
+            return {"video_url": video_url, "title": "Snapchat Video", "platform": "snapchat"}
+
     except Exception as e:
-        print(f"[Pinterest] page scrape error: {e}")
+        print(f"[Snapchat] scrape error: {e}")
 
     return None
 
@@ -142,8 +157,6 @@ def social_download():
         result = fetch_facebook(url)
     elif "snapchat.com" in url or "t.snapchat.com" in url:
         result = fetch_snapchat(url)
-    elif "pinterest.com" in url or "pin.it" in url:
-        result = fetch_pinterest(url)
     else:
         return jsonify({"error": "Unsupported platform"}), 400
 
@@ -163,7 +176,6 @@ def social_proxy():
     referers = {
         "facebook":  "https://www.facebook.com/",
         "snapchat":  "https://www.snapchat.com/",
-        "pinterest": "https://www.pinterest.com/",
     }
     hdrs = {
         **HEADERS,
