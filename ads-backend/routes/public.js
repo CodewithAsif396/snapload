@@ -27,20 +27,28 @@ router.get('/', (req, res) => {
     res.json(safe);
 });
 
-// Track impression
-router.post('/:id/impression', (req, res) => {
-    const ad = ads.getById(req.params.id);
-    if (!ad || !ad.active) return res.status(404).json({ error: 'Ad not found.' });
-    ads.update(req.params.id, { impressions: ad.impressions + 1 });
-    res.json({ ok: true });
+// Redirect to ad link and track click
+router.get('/click/:id', (req, res) => {
+    const ad = storage.ads.getById(req.params.id);
+    if (!ad) return res.redirect('/');
+    storage.stats.log('click', ad.type);
+    res.redirect(ad.linkUrl);
 });
 
-// Track click
-router.post('/:id/click', (req, res) => {
-    const ad = ads.getById(req.params.id);
-    if (!ad || !ad.active) return res.status(404).json({ error: 'Ad not found.' });
-    ads.update(req.params.id, { clicks: ad.clicks + 1 });
-    res.json({ ok: true, linkUrl: ad.linkUrl });
+// Serve ad with impression tracking
+router.get('/view/:id', (req, res) => {
+    const ad = storage.ads.getById(req.params.id);
+    if (!ad) return res.status(404).send('Ad not found');
+    storage.stats.log('impression', ad.type);
+    res.send(ad.html || `<a href="/api/ads/click/${ad.id}"><img src="${ad.imageUrl}" style="max-width:100%"></a>`);
+});
+
+// Generic tracking endpoint
+router.post('/track', (req, res) => {
+    const { type, platform } = req.body;
+    const country = req.headers['cf-ipcountry'] || 'Unknown';
+    storage.stats.log(type, platform, country);
+    res.status(204).end();
 });
 
 module.exports = router;

@@ -290,8 +290,7 @@
                 <span id="platform-cycle" class="gradient-text italic">Without Limits.</span>
             </h1>
             <p class="text-sm sm:text-lg md:text-xl text-gray-400 mb-6 sm:mb-10 max-w-2xl mx-auto px-4">
-                The fastest way to save high-quality media from YouTube, TikTok, Instagram, Twitter/X, Facebook and Snapchat.
-                Zero watermarks, 4K support, and completely secure.
+                Download YouTube, TikTok, Instagram, and Twitter videos in 4K quality for free. No watermark, fast, and secure.
             </p>
 
             <!-- ── Platform Tabs ──────────────────────────────────────────────
@@ -1169,6 +1168,28 @@
                 const speed = 0.1 + (i * 0.05);
                 blob.style.transform = `translateY(${scrolled * speed}px)`;
             });
+        });
+
+        // ── Analytics Tracking ───────────────────────────────────────────────
+        async function trackEvent(type, platform = '') {
+            try {
+                const currentPlatform = platform || (window.location.pathname.replace(/^\//, '') || 'Home');
+                await fetch('/api/ads/track', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, platform: currentPlatform })
+                });
+            } catch (e) { console.warn('Tracking failed:', e); }
+        }
+
+        // Track Impression on Load
+        trackEvent('impression');
+
+        // Track Click on result buttons
+        document.body.addEventListener('click', (e) => {
+            if (e.target.closest('.download-btn') || e.target.closest('[id^="download-"]')) {
+                trackEvent('download');
+            }
         });
 
     }); // end DOMContentLoaded

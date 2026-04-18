@@ -109,13 +109,18 @@ router.patch('/ads/:id/toggle', requireAuth, (req, res) => {
 });
 
 router.get('/stats', requireAuth, (_req, res) => {
-    const all    = ads.getAll();
+    const all = ads.getAll();
     const totals = all.reduce((a, ad) => {
         a.impressions += ad.impressions;
         a.clicks      += ad.clicks;
         return a;
     }, { impressions: 0, clicks: 0 });
-    res.json({ totalAds: all.length, activeAds: all.filter(a => a.active).length, ...totals });
+    res.json({ 
+        totalAds:    all.length, 
+        activeAds:   all.filter(a => a.active).length, 
+        ...totals,
+        history:     stats.getHistory()
+    });
 });
 
 // ─── Maintenance ─────────────────────────────────────────────────────────────

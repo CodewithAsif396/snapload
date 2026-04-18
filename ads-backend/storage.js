@@ -3,6 +3,7 @@ const path = require('path');
 
 const ADS_FILE      = path.join(__dirname, 'data', 'ads.json');
 const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
+const STATS_FILE    = path.join(__dirname, 'data', 'stats.json');
 
 const DEFAULT_SETTINGS = {
     general:      { siteName: 'Doomsdaysnap', tagline: 'Fast video downloader', logoUrl: '', faviconUrl: '' },
@@ -59,4 +60,36 @@ const settings = {
     },
 };
 
-module.exports = { ads, settings };
+// ─── Stats & Analytics ────────────────────────────────────────────────────────
+const stats = {
+    getHistory() {
+        const data = readJSON(STATS_FILE, { history: [] });
+        // Clean up older than 3 days
+        const now = new Date();
+        const threeDaysAgo = new Date(now.setDate(now.getDate() - 3)).toISOString().split('T')[0];
+        const filtered = (data.history || []).filter(h => h.date >= threeDaysAgo);
+        if (filtered.length !== (data.history || []).length) writeJSON(STATS_FILE, { history: filtered });
+        return filtered;
+    },
+    log(type, platform = '', country = 'Unknown') {
+        const data = readJSON(STATS_FILE, { history: [] });
+        const today = new Date().toISOString().split('T')[0];
+        let day = data.history.find(h => h.date === today);
+
+        if (!day) {
+            day = { date: today, impressions: 0, clicks: 0, downloads: 0, locations: {}, platforms: {} };
+            data.history.push(day);
+        }
+
+        if (type === 'impression') day.impressions++;
+        if (type === 'click')      day.clicks++;
+        if (type === 'download')   day.downloads++;
+
+        if (country)   day.locations[country] = (day.locations[country] || 0) + 1;
+        if (platform)  day.platforms[platform] = (day.platforms[platform] || 0) + 1;
+
+        writeJSON(STATS_FILE, data);
+    }
+};
+
+module.exports = { ads, settings, stats };

@@ -249,6 +249,19 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .placement-hint strong{color:#f0f6fc}
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
+/* ── Analytics Dashboard ────────────────────────────────────────────────── */
+.history-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+.history-table th { text-align: left; padding: 0.75rem; border-bottom: 2px solid var(--border); color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
+.history-table td { padding: 0.85rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
+.stat-trend { font-size: 0.7rem; margin-top: 0.2rem; display: flex; align-items: center; gap: 0.25rem; }
+.trend-up { color: var(--green); }
+.trend-down { color: var(--red); }
+
+.geo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+.geo-item { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: rgba(255,255,255,0.03); border-radius: 8px; }
+.geo-flag { width: 24px; height: 16px; background: #334155; border-radius: 2px; display: inline-block; margin-right: 0.5rem; }
+.platform-chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.6rem; background: rgba(255,255,255,0.05); border-radius: 20px; font-size: 0.75rem; margin: 0.2rem; }
+
 @media(max-width:900px){
   .stats-grid{grid-template-columns:repeat(2,1fr)}
   .settings-grid{grid-template-columns:1fr}
@@ -323,19 +336,56 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
           <div class="stat-icon"><i class="fas fa-rectangle-ad"></i></div>
           <div><div class="stat-value" id="s-total">—</div><div class="stat-label">Total Ads</div></div>
         </div>
-        <div class="stat-card gb">
-          <div class="stat-icon"><i class="fas fa-circle-check"></i></div>
-          <div><div class="stat-value" id="s-active">—</div><div class="stat-label">Active Ads</div></div>
-        </div>
         <div class="stat-card gg">
           <div class="stat-icon"><i class="fas fa-eye"></i></div>
-          <div><div class="stat-value" id="s-impressions">—</div><div class="stat-label">Impressions</div></div>
+          <div><div class="stat-value" id="s-impressions">—</div><div class="stat-label">Total Views</div></div>
         </div>
         <div class="stat-card go">
           <div class="stat-icon"><i class="fas fa-arrow-pointer"></i></div>
-          <div><div class="stat-value" id="s-clicks">—</div><div class="stat-label">Clicks</div><div class="stat-sub" id="s-ctr"></div></div>
+          <div><div class="stat-value" id="s-clicks">—</div><div class="stat-label">Ad Clicks</div><div class="stat-sub" id="s-ctr"></div></div>
+        </div>
+        <div class="stat-card gb">
+          <div class="stat-icon"><i class="fas fa-download"></i></div>
+          <div><div class="stat-value" id="s-downloads">—</div><div class="stat-label">Downloads</div></div>
         </div>
       </div>
+
+      <!-- 3-Day History & Detailed Analytics -->
+      <div class="two-col" style="margin-top: 2rem; display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+        <div class="card">
+          <div class="card-header"><i class="fas fa-history"></i><h3>Last 3 Days Activity</h3></div>
+          <div style="overflow-x: auto;">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Views</th>
+                  <th>Clicks</th>
+                  <th>Downloads</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody">
+                <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:2rem">Loading accurate history...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><i class="fas fa-earth-americas"></i><h3>Top Locations</h3></div>
+          <div id="geo-list" style="max-height: 300px; overflow-y: auto; padding-right: 0.5rem;">
+            <p style="text-align:center;color:var(--muted);padding:2rem">Analyzing traffic...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-header"><i class="fas fa-layer-group"></i><h3>Platform & Tool Breakdown</h3></div>
+        <div id="platform-breakdown" style="padding: 1rem 0; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+          <p style="color:var(--muted)">Processing tool usage data...</p>
+        </div>
+      </div>
+
       <!-- Quick Actions -->
       <div class="quick-grid">
         <button class="qa-btn qa-purple" onclick="openAdModal()">
@@ -1079,15 +1129,81 @@ async function quickToggleAnnouncement() {
 let allAds = [];
 
 async function loadOverview() {
-  loadQuickActions(); // fire and don't wait — updates the cards async
+  loadQuickActions(); // fire and don't wait
   try {
     const stats = await api('/admin/stats');
+    
+    // Totals
     document.getElementById('s-total').textContent       = stats.totalAds;
-    document.getElementById('s-active').textContent      = stats.activeAds;
     document.getElementById('s-impressions').textContent = fmtNum(stats.impressions);
     document.getElementById('s-clicks').textContent      = fmtNum(stats.clicks);
     const ctr = stats.impressions > 0 ? ((stats.clicks / stats.impressions) * 100).toFixed(1) : '0.0';
     document.getElementById('s-ctr').textContent = `CTR ${ctr}%`;
+    
+    // Downloads
+    const totalDownloads = stats.history.reduce((a, b) => a + b.downloads, 0);
+    document.getElementById('s-downloads').textContent = fmtNum(totalDownloads);
+
+    // 3-Day History
+    const tbody = document.getElementById('history-tbody');
+    if (stats.history.length) {
+      tbody.innerHTML = stats.history.map(day => `
+        <tr>
+          <td><strong>${day.date}</strong></td>
+          <td>${fmtNum(day.impressions)}</td>
+          <td>${fmtNum(day.clicks)}</td>
+          <td><span style="color:var(--accent);font-weight:700">${fmtNum(day.downloads)}</span></td>
+        </tr>
+      `).join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:2rem">No activity in the last 3 days</td></tr>';
+    }
+
+    // Top Locations
+    const geoList = document.getElementById('geo-list');
+    const geoData = stats.history.reduce((acc, day) => {
+        for (const [code, count] of Object.entries(day.locations)) {
+            acc[code] = (acc[code] || 0) + count;
+        }
+        return acc;
+    }, {});
+    
+    const sortedGeo = Object.entries(geoData).sort((a, b) => b[1] - a[1]);
+    if (sortedGeo.length) {
+        geoList.innerHTML = sortedGeo.map(([code, count]) => `
+            <div class="geo-item">
+                <div style="display:flex;align-items:center">
+                    <span class="geo-flag"></span>
+                    <span style="font-size:.85rem;font-weight:600">${code}</span>
+                </div>
+                <span style="font-size:.8rem;color:var(--accent)">${fmtNum(count)} visitors</span>
+            </div>
+        `).join('');
+    } else {
+        geoList.innerHTML = '<p style="text-align:center;color:var(--muted);padding:2rem">No geographic data yet</p>';
+    }
+
+    // Platform Breakdown
+    const platDiv = document.getElementById('platform-breakdown');
+    const platData = stats.history.reduce((acc, day) => {
+        for (const [p, count] of Object.entries(day.platforms)) {
+            acc[p] = (acc[p] || 0) + count;
+        }
+        return acc;
+    }, {});
+    
+    const sortedPlat = Object.entries(platData).sort((a, b) => b[1] - a[1]);
+    if (sortedPlat.length) {
+        platDiv.innerHTML = sortedPlat.map(([p, count]) => `
+            <div class="platform-chip">
+                <i class="fas fa-microchip" style="color:var(--accent)"></i>
+                <span>${p}</span>
+                <strong style="color:var(--text);margin-left:0.2rem">${fmtNum(count)}</strong>
+            </div>
+        `).join('');
+    } else {
+        platDiv.innerHTML = '<p style="color:var(--muted)">No platform usage recorded</p>';
+    }
 
     allAds = await api('/admin/ads');
     const card = document.getElementById('overview-card');
