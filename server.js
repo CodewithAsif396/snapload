@@ -390,18 +390,18 @@ const LEGAL_DATA = {
         desc: 'Learn about how Doomsdaysnap handles privacy and data protection.',
         h1: 'Privacy Policy',
         content: `
-            <div class="space-y-0.5">
+            <div class="space-y-2">
                 <section class="m-0 p-0">
-                    <h2 class="text-sm font-bold text-white m-0 p-0">1. Data Collection</h2>
-                    <p class="text-gray-400 text-[10px] leading-tight m-0 p-0">Doomsdaysnap is a privacy-first platform. We do NOT store personal data, IP addresses, or video download history on our servers. All video processing is performed in temporary memory and never persisted.</p>
+                    <h2 class="text-base font-bold text-white m-0 p-0 mb-0.5">1. Data Collection</h2>
+                    <p class="text-gray-400 text-xs leading-normal m-0 p-0">Doomsdaysnap is a privacy-first platform. We do NOT store personal data, IP addresses, or video download history on our servers. All video processing is performed in temporary memory and never persisted.</p>
                 </section>
-                <section class="m-0 p-0 mt-1">
-                    <h2 class="text-sm font-bold text-white m-0 p-0">2. Cookies & Analytics</h2>
-                    <p class="text-gray-400 text-[10px] leading-tight m-0 p-0">We use standard Google Analytics to understand platform performance. No personally identifiable information is shared with third parties. You can opt-out by disabling cookies in your browser.</p>
+                <section class="m-0 p-0 mt-2">
+                    <h2 class="text-base font-bold text-white m-0 p-0 mb-0.5">2. Cookies & Analytics</h2>
+                    <p class="text-gray-400 text-xs leading-normal m-0 p-0">We use standard Google Analytics to understand platform performance. No personally identifiable information is shared with third parties. You can opt-out by disabling cookies in your browser.</p>
                 </section>
-                <section class="m-0 p-0 mt-1">
-                    <h2 class="text-sm font-bold text-white m-0 p-0">3. External Links</h2>
-                    <p class="text-gray-400 text-[10px] leading-tight m-0 p-0">Our service allows you to download content from third-party platforms like YouTube and TikTok. We are not responsible for the privacy practices of those external sites.</p>
+                <section class="m-0 p-0 mt-2">
+                    <h2 class="text-base font-bold text-white m-0 p-0 mb-0.5">3. External Links</h2>
+                    <p class="text-gray-400 text-xs leading-normal m-0 p-0">Our service allows you to download content from third-party platforms like YouTube and TikTok. We are not responsible for the privacy practices of those external sites.</p>
                 </section>
             </div>
         `
@@ -411,18 +411,18 @@ const LEGAL_DATA = {
         desc: 'Read the terms and conditions for using Doomsdaysnap services.',
         h1: 'Terms of Service',
         content: `
-            <div class="space-y-0.5">
+            <div class="space-y-2">
                 <section class="m-0 p-0">
-                    <h2 class="text-sm font-bold text-white m-0 p-0">1. Service Usage</h2>
-                    <p class="text-gray-400 text-[10px] leading-tight m-0 p-0">Doomsdaysnap provides a tool to download publicly available media. By using this service, you agree to comply with all applicable copyright laws and regulations.</p>
+                    <h2 class="text-base font-bold text-white m-0 p-0 mb-0.5">1. Service Usage</h2>
+                    <p class="text-gray-400 text-xs leading-normal m-0 p-0">Doomsdaysnap provides a tool to download publicly available media. By using this service, you agree to comply with all applicable copyright laws and regulations.</p>
                 </section>
-                <section class="m-0 p-0 mt-1">
-                    <h2 class="text-sm font-bold text-white m-0 p-0">2. Personal Use</h2>
-                    <p class="text-gray-400 text-[10px] leading-tight m-0 p-0">Our service is intended for personal, non-commercial use only. You may not use this platform to bypass encryption or access private content.</p>
+                <section class="m-0 p-0 mt-2">
+                    <h2 class="text-base font-bold text-white m-0 p-0 mb-0.5">2. Personal Use</h2>
+                    <p class="text-gray-400 text-xs leading-normal m-0 p-0">Our service is intended for personal, non-commercial use only. You may not use this platform to bypass encryption or access private content.</p>
                 </section>
-                <section class="m-0 p-0 mt-1">
-                    <h2 class="text-sm font-bold text-white m-0 p-0">3. Disclaimer</h2>
-                    <p class="text-gray-400 text-[10px] leading-tight m-0 p-0">The service is provided "as is" without warranty of any kind. Doomsdaysnap is not affiliated with YouTube, TikTok, Facebook, or any other social media platform.</p>
+                <section class="m-0 p-0 mt-2">
+                    <h2 class="text-base font-bold text-white m-0 p-0 mb-0.5">3. Disclaimer</h2>
+                    <p class="text-gray-400 text-xs leading-normal m-0 p-0">The service is provided "as is" without warranty of any kind. Doomsdaysnap is not affiliated with YouTube, TikTok, Facebook, or any other social media platform.</p>
                 </section>
             </div>
         `
@@ -448,12 +448,12 @@ const LEGAL_DATA = {
                 .replace('<!-- TOOL_FAQ -->', '')
                 .replace('<!-- TOOL_GRID_ITEMS -->', '')
                 .replace('<!-- TOOL_RICH_CONTENT -->', `
-                    <div class="max-w-3xl mx-auto py-1 px-6 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-xl m-0">
-                        <h1 class="text-base font-black text-white m-0 p-0 gradient-text text-center leading-none">${legal.h1}</h1>
-                        <hr class="border-white/10 my-1">
+                    <div class="max-w-4xl mx-auto py-3 px-6 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-xl m-0">
+                        <h1 class="text-2xl font-black text-white m-0 p-0 gradient-text text-center pb-2">${legal.h1}</h1>
+                        <hr class="border-white/10 mb-3">
                         ${legal.content}
-                        <div class="mt-2 pt-1 border-t border-white/10 text-center">
-                            <a href="/" class="text-[9px] text-gray-500 hover:text-white transition-all uppercase tracking-widest leading-none">← Back</a>
+                        <div class="mt-4 pt-2 border-t border-white/10 text-center">
+                            <a href="/" class="text-[10px] text-gray-500 hover:text-white transition-all uppercase tracking-widest leading-none">← Back</a>
                         </div>
                     </div>
                 `);
