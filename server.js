@@ -1003,6 +1003,8 @@ app.get('/api/download', rateLimit, async (req, res) => {
             }
             if (pyRes.headers['content-length']) res.setHeader('Content-Length', pyRes.headers['content-length']);
             if (pyRes.headers['content-type']) res.setHeader('Content-Type', pyRes.headers['content-type']);
+            
+            console.log(`[DOWNLOAD] Streaming from Python engine started: ${safeUrl.slice(0, 40)}...`);
             pyRes.pipe(res);
         });
         

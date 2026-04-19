@@ -178,20 +178,23 @@ async def stream_parallel(url: str):
 
 
 async def stream_with_ffmpeg_merge(video_url: str, audio_url: str, title: str = "video"):
-    hdrs_str = "User-Agent: Mozilla/5.0\r\nReferer: https://www.youtube.com/\r\n"
+    ua = STREAM_HEADERS["User-Agent"]
+    hdrs_str = f"User-Agent: {ua}\r\nReferer: https://www.youtube.com/\r\n"
 
     cmd = [
         FFMPEG_PATH, '-hide_banner', '-loglevel', 'error',
-        '-reconnect', '1', '-reconnect_streamed', '1',
+        '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
         '-headers', hdrs_str, '-i', video_url,
-        '-reconnect', '1', '-reconnect_streamed', '1',
+        '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
         '-headers', hdrs_str, '-i', audio_url,
-        '-c:v', 'copy', '-c:a', 'aac',
+        '-c:v', 'copy', '-c:a', 'aac', '-strict', 'experimental',
         '-map', '0:v:0', '-map', '1:a:0',
         '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
         'pipe:1'
     ]
 
+    print(f"[DEBUG] Starting ffmpeg merge for: {title}")
+    
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -199,15 +202,23 @@ async def stream_with_ffmpeg_merge(video_url: str, audio_url: str, title: str = 
     )
 
     try:
+        # Read stdout in chunks and yield to response
         while True:
             chunk = await proc.stdout.read(1024 * 1024)
             if not chunk:
+                # Check for errors if stdout is empty immediately
+                stderr_data = await proc.stderr.read()
+                if stderr_data:
+                    print(f"[FFMPEG ERROR] {stderr_data.decode().strip()}")
                 break
             yield chunk
+    except Exception as e:
+        print(f"[STREAM ERROR] {str(e)}")
     finally:
         try:
-            proc.terminate()
-            await proc.wait()
+            if proc.returncode is None:
+                proc.terminate()
+                await proc.wait()
         except Exception:
             pass
 
