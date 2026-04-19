@@ -431,6 +431,8 @@ const LEGAL_DATA = {
 ['privacy', 'tos'].forEach(slug => {
     app.get(`/${slug}`, (req, res) => {
         const legal = LEGAL_DATA[slug];
+        if (!legal) return res.status(404).send('Not Found');
+
         fs.readFile(path.join(__dirname, 'app.html'), 'utf8', (err, data) => {
             if (err) return res.status(500).send('Error');
             
@@ -439,13 +441,13 @@ const LEGAL_DATA = {
                 .replace(/<meta name="description" content=".*?">/, `<meta name="description" content="${legal.desc}">`)
                 .replace('id="downloader-input-section"', 'id="downloader-input-section" style="display:none !important"')
                 .replace('id="mobile-paste-sample-row"', 'id="mobile-paste-sample-row" style="display:none !important"')
-                .replace('<!-- HOME_PLATFORM_GRID -->', '')
+                .replace(/<!-- HOME_PLATFORM_GRID -->/g, '') // Hide Why Choose etc.
                 .replace('<!-- TOOL_STEPS -->', '')
                 .replace('<!-- TOOL_FAQ -->', '')
                 .replace('<!-- TOOL_GRID_ITEMS -->', '')
                 .replace('<!-- TOOL_RICH_CONTENT -->', `
                     <div class="max-w-4xl mx-auto py-20 px-6 bg-white/5 rounded-[2rem] border border-white/10 backdrop-blur-xl">
-                        <h1 class="text-4xl sm:text-6xl font-black text-white mb-12 gradient-text">${legal.h1}</h1>
+                        <h1 class="text-4xl sm:text-6xl font-black text-white mb-12 gradient-text text-center">${legal.h1}</h1>
                         ${legal.content}
                     </div>
                 `);

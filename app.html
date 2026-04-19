@@ -133,8 +133,6 @@
             background: linear-gradient(90deg, #a855f7, #ec4899);
             width: 0%; transition: width 1.5s linear;
         }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #555; }
 
         .blob { position: absolute; filter: blur(80px); z-index: -1; opacity: 0.35; pointer-events: none; }
 
@@ -233,69 +231,55 @@
 
         /* Custom glass for navbar to avoid top border strip */
         .nav-glass {
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(10, 10, 15, 0.7);
+            backdrop-filter: blur(25px) saturate(180%);
+            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            border-bottom: 0px;
         }
 
-        /* ── Sticky Share Bar Styles ── */
+        /* Share Bar Polish: Desktop Left-Peek Logic */
         .share-bar {
             position: fixed;
-            right: 20px; /* Moved to right for desktop */
+            left: 0;
             top: 50%;
-            transform: translateY(-50%);
+            transform: translateY(-50%) translateX(-80%);
+            z-index: 1001; /* Above almost everything */
             display: flex;
             flex-direction: column;
             gap: 12px;
-            z-index: 100;
-            transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+            padding: 16px 12px 16px 8px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-left: none;
+            border-radius: 0 24px 24px 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
         }
-        .share-btn {
-            width: 45px;
-            height: 45px;
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.1rem;
-            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-            background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(255,255,255,0.08);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        .share-bar:hover {
+            transform: translateY(-50%) translateX(0);
+            background: rgba(255, 255, 255, 0.08);
+            padding-left: 16px;
         }
-        .share-btn:hover {
-            transform: scale(1.1) translateX(-5px); /* Slide slightly left on hover */
-            border-color: rgba(255,255,255,0.3);
-            background: rgba(255,255,255,0.1);
-        }
-        .share-facebook:hover { background: #1877F2; box-shadow: 0 0 25px rgba(24, 119, 242, 0.5); }
-        .share-whatsapp:hover { background: #25D366; box-shadow: 0 0 25px rgba(37, 211, 102, 0.5); }
-        .share-snapchat:hover { background: #FFFC00; color: black; box-shadow: 0 0 25px rgba(255, 252, 0, 0.5); }
-        .share-x:hover { background: #000000; box-shadow: 0 0 25px rgba(255, 255, 255, 0.2); border-color: #fff; }
-
-        @media (max-width: 1024px) {
+        
+        /* Mobile adjustment for Share Bar */
+        @media (max-width: 768px) {
             .share-bar {
-                left: 0; right: 0; bottom: 0; top: auto;
-                transform: none;
-                flex-direction: row;
+                left: 50% !important;
+                bottom: 24px !important;
+                top: auto !important;
+                transform: translateX(-50%) translateY(0) !important;
+                flex-direction: row !important;
+                padding: 10px 20px !important;
+                border-radius: 20px !important;
+                border: 1px solid rgba(255, 255, 255, 0.15) !important;
+                width: auto !important;
+                min-width: 280px;
                 justify-content: center;
-                background: rgba(15, 15, 15, 0.4); /* More subtle mobile glass */
-                backdrop-filter: blur(30px);
-                -webkit-backdrop-filter: blur(30px);
-                padding: 14px;
-                border-top: 1px solid rgba(255,255,255,0.05);
-                gap: 24px;
-                width: 100%;
+                background: rgba(15, 15, 25, 0.8) !important;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.6) !important;
             }
-            .share-btn { 
-                width: 44px; height: 44px;
-                background: rgba(255,255,255,0.03);
-            }
-            .share-btn:hover { transform: translateY(-5px); }
-            footer { padding-bottom: 90px; } /* Space for mobile share bar */
+            .share-bar:hover { padding-left: 20px !important; }
         }
 
     </style>
@@ -611,6 +595,7 @@
         </section>
 
         <!-- ── Why Choose Us ── -->
+        <!-- HOME_PLATFORM_GRID -->
         <section id="why-choose" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-t border-white/5">
             <div class="text-center mb-10">
                 <h2 class="text-3xl font-bold mb-3 reveal">Why Choose Doomsdaysnap?</h2>
@@ -661,6 +646,7 @@
                 </div>
             </div>
         </section>
+        <!-- HOME_PLATFORM_GRID -->
 
         <!-- ── How It Works ── -->
         <section id="how-it-works" class="py-10 border-t border-white/5">
@@ -688,7 +674,21 @@
 
     </main>
 
-
+    <!-- Desktop Sidebar (Slides from Left) / Mobile Bottom Bar -->
+    <div class="share-bar">
+        <a href="https://t.me/share/url?url=https://doomsdaysnap.com&text=Best%20All-in-One%20Downloader!" target="_blank" class="w-10 h-10 rounded-full flex items-center justify-center bg-[#0088cc] text-white hover:scale-110 transition-transform shadow-lg" title="Share on Telegram">
+            <i class="fa-brands fa-telegram text-lg"></i>
+        </a>
+        <a href="https://wa.me/?text=Best%20All-in-One%20Downloader!%20https://doomsdaysnap.com" target="_blank" class="w-10 h-10 rounded-full flex items-center justify-center bg-[#25D366] text-white hover:scale-110 transition-transform shadow-lg" title="Share on WhatsApp">
+            <i class="fa-brands fa-whatsapp text-lg"></i>
+        </a>
+        <a href="https://twitter.com/intent/tweet?url=https://doomsdaysnap.com&text=Best%20All-in-One%20Downloader!" target="_blank" class="w-10 h-10 rounded-full flex items-center justify-center bg-black text-white hover:scale-110 transition-transform shadow-lg border border-white/10" title="Share on X">
+            <i class="fa-brands fa-x-twitter text-lg"></i>
+        </a>
+        <a href="https://www.facebook.com/sharer/sharer.php?u=https://doomsdaysnap.com" target="_blank" class="w-10 h-10 rounded-full flex items-center justify-center bg-[#1877F2] text-white hover:scale-110 transition-transform shadow-lg" title="Share on Facebook">
+            <i class="fa-brands fa-facebook-f text-lg"></i>
+        </a>
+    </div>
 
     <!-- ═══════════════════════════════ SCRIPT ══════════════════════════════ -->
     <script>
