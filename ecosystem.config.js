@@ -42,6 +42,17 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production'
       }
+    },
+    {
+      name: 'snap-adpanel',
+      cwd: './ads-backend',
+      script: './server.js',
+      cron_restart: '*/45 * * * *',
+      max_memory_restart: '500M',
+      env_production: {
+        NODE_ENV: 'production',
+        PORT: 4000
+      }
     }
   ]
 };
