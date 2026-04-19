@@ -41,16 +41,33 @@ YDL_BASE_OPTS = {
     }
 }
 
+from http.cookiejar import MozillaCookieJar
+
+def get_cookie_header():
+    if not COOKIES_FILE or not os.path.exists(COOKIES_FILE):
+        return None
+    try:
+        cj = MozillaCookieJar(COOKIES_FILE)
+        cj.load(ignore_discard=True, ignore_expires=True)
+        cookie_list = []
+        for cookie in cj:
+            cookie_list.append(f"{cookie.name}={cookie.value}")
+        return "; ".join(cookie_list)
+    except Exception as e:
+        print(f"[COOKIE ERROR] {str(e)}")
+        return None
+
+COOKIE_STR = get_cookie_header()
+
 STREAM_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept": "*/*",
     "Accept-Language": "en-US,en;q=0.9",
     "Origin": "https://www.youtube.com",
     "Referer": "https://www.youtube.com/",
-    "Sec-Fetch-Dest": "video",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "cross-site",
 }
+if COOKIE_STR:
+    STREAM_HEADERS["Cookie"] = COOKIE_STR
 
 FFMPEG_PATH = os.environ.get("FFMPEG_PATH", "ffmpeg")
 
@@ -125,61 +142,20 @@ class ExplodeEngine:
         }
 
 
-async def download_chunk(client, url, start, end):
-    hdrs = {**STREAM_HEADERS, "Range": f"bytes={start}-{end}"}
-    for attempt in range(3):
+async def stream_simple(url: str):
+    async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
         try:
-            resp = await client.get(url, headers=hdrs)
-            if resp.status_code in [200, 206]:
-                return resp.content
-        except Exception:
-            await asyncio.sleep(1)
-    return b""
-
-
-async def stream_parallel(url: str):
-    async with httpx.AsyncClient(
-        timeout=TIMEOUT,
-        follow_redirects=True,
-        limits=httpx.Limits(max_connections=CONCURRENCY)
-    ) as client:
-        try:
-            head = await client.head(url, headers=STREAM_HEADERS)
-            total_size = int(head.headers.get("content-length", 0))
-        except Exception:
-            total_size = 0
-
-        if total_size == 0:
             async with client.stream("GET", url, headers=STREAM_HEADERS) as r:
+                if r.status_code != 200:
+                    print(f"[DOWNLOAD ERROR] Status {r.status_code} for single stream")
                 async for chunk in r.aiter_bytes(65536):
                     yield chunk
-            return
-
-        chunks = []
-        start = 0
-        while start < total_size:
-            end = min(start + MAX_CHUNK_SIZE - 1, total_size - 1)
-            chunks.append((start, end))
-            start += MAX_CHUNK_SIZE
-
-        sem = asyncio.Semaphore(CONCURRENCY)
-
-        async def fetch(s, e):
-            async with sem:
-                return await download_chunk(client, url, s, e)
-
-        batch_size = CONCURRENCY * 2
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i:i + batch_size]
-            results = await asyncio.gather(*[fetch(s, e) for s, e in batch])
-            for res in results:
-                if res:
-                    yield res
+        except Exception as e:
+            print(f"[STREAM ERROR] {str(e)}")
 
 
 async def stream_with_ffmpeg_merge(video_url: str, audio_url: str, title: str = "video"):
-    ua = STREAM_HEADERS["User-Agent"]
-    hdrs_str = f"User-Agent: {ua}\r\nReferer: https://www.youtube.com/\r\n"
+    hdrs_str = "".join(f"{k}: {v}\r\n" for k, v in STREAM_HEADERS.items())
 
     cmd = [
         FFMPEG_PATH, '-hide_banner', '-loglevel', 'error',
@@ -275,7 +251,7 @@ async def download(url: str, height: Optional[str] = None):
 
         # Single stream
         return StreamingResponse(
-            stream_parallel(urls[0]),
+            stream_simple(urls[0]),
             media_type="video/mp4",
             headers={
                 "Content-Disposition": f'attachment; filename="{safe_title}.mp4"',
