@@ -74,8 +74,8 @@ FFMPEG_PATH = os.environ.get("FFMPEG_PATH", "ffmpeg")
 class ExplodeEngine:
     @staticmethod
     async def get_info(url: str):
-        # Merge formats to get both adaptive and progressive
-        opts = {**YDL_BASE_OPTS, 'format': 'bestvideo+bestaudio/best'}
+        # Merge formats to get both adaptive and progressive (Exclude HLS/m3u8)
+        opts = {**YDL_BASE_OPTS, 'format': '(bestvideo+bestaudio/best)[protocol^=http]'}
 
         def extract():
             with yt_dlp.YoutubeDL(opts) as ydl:
@@ -218,10 +218,16 @@ async def get_info(url: str):
 async def download(url: str, height: Optional[str] = None):
     try:
         h = int(height) if height else None
+        # Exclude HLS (m3u8) protocols — they return manifest URLs that break direct streaming
+        # [protocol^=http] ensures we only get standard http/https streams
+        proto = '[protocol^=http]'
         if h:
-            fmt = f'bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={h}]+bestaudio/best[height<={h}]'
+            fmt = (f'bestvideo[height<={h}][ext=mp4]{proto}+bestaudio[ext=m4a]{proto}'
+                   f'/bestvideo[height<={h}]{proto}+bestaudio{proto}'
+                   f'/best[height<={h}]{proto}')
         else:
-            fmt = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best'
+            fmt = (f'bestvideo[ext=mp4]{proto}+bestaudio[ext=m4a]{proto}'
+                   f'/bestvideo{proto}+bestaudio{proto}/best{proto}')
 
         opts = {**YDL_BASE_OPTS, 'format': fmt}
 
