@@ -7,6 +7,7 @@ const path     = require('path');
 const { router: adminRouter, setAdminHash } = require('./routes/admin');
 const publicRouter   = require('./routes/public');
 const settingsRouter = require('./routes/settings');
+const cookiesRouter  = require('./routes/cookies');
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -22,7 +23,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/ads',       publicRouter);
 app.use('/admin',         adminRouter);
 app.use('/api/settings',  settingsRouter);
-app.use('/admin/settings', settingsRouter); // also accessible under /admin prefix
+app.use('/admin/settings', settingsRouter);
+app.use('/admin/cookies',  cookiesRouter); // also accessible under /admin prefix
 
 app.get('/health', (_req, res) =>
     res.json({ status: 'ok', uptime: Math.floor(process.uptime()) }));
