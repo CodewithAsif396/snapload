@@ -237,51 +237,6 @@
             border-bottom: 0px;
         }
 
-        /* Share Bar Polish: Desktop Left-Peek Logic */
-        .share-bar {
-            position: fixed;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%) translateX(-80%);
-            z-index: 1001; /* Above almost everything */
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            padding: 16px 12px 16px 8px;
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-left: none;
-            border-radius: 0 24px 24px 0;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
-        }
-        .share-bar:hover {
-            transform: translateY(-50%) translateX(0);
-            background: rgba(255, 255, 255, 0.08);
-            padding-left: 16px;
-        }
-        
-        /* Mobile adjustment for Share Bar */
-        @media (max-width: 768px) {
-            .share-bar {
-                left: 50% !important;
-                bottom: 24px !important;
-                top: auto !important;
-                transform: translateX(-50%) translateY(0) !important;
-                flex-direction: row !important;
-                padding: 10px 20px !important;
-                border-radius: 20px !important;
-                border: 1px solid rgba(255, 255, 255, 0.15) !important;
-                width: auto !important;
-                min-width: 280px;
-                justify-content: center;
-                background: rgba(15, 15, 25, 0.8) !important;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.6) !important;
-            }
-            .share-bar:hover { padding-left: 20px !important; }
-        }
-
     </style>
 </head>
 <body class="antialiased relative min-h-screen flex flex-col font-sans">
@@ -1423,50 +1378,6 @@
             </div>
         </div>
 
-        <!-- Sticky Share Bar -->
-        <div class="share-bar reveal active">
-            <a href="#" onclick="sharePlatform('facebook')" class="share-btn share-facebook" title="Share on Facebook">
-                <i class="fa-brands fa-facebook-f"></i>
-            </a>
-            <a href="#" onclick="sharePlatform('whatsapp')" class="share-btn share-whatsapp" title="Share on WhatsApp">
-                <i class="fa-brands fa-whatsapp"></i>
-            </a>
-            <a href="#" onclick="sharePlatform('snapchat')" class="share-btn share-snapchat" title="Share on Snapchat">
-                <i class="fa-brands fa-snapchat"></i>
-            </a>
-            <a href="#" onclick="sharePlatform('x')" class="share-btn share-x" title="Share on X (Twitter)">
-                <i class="fa-brands fa-x-twitter"></i>
-            </a>
-        </div>
-
-        <script>
-            function sharePlatform(platform) {
-                const url = encodeURIComponent(window.location.origin);
-                const text = encodeURIComponent('Download high-quality videos from YouTube, TikTok, and more with Doomsdaysnap! 🔥');
-                let shareUrl = '';
-
-                switch(platform) {
-                    case 'facebook':
-                        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
-                        break;
-                    case 'whatsapp':
-                        shareUrl = `https://api.whatsapp.com/send?text=${text}%20${url}`;
-                        break;
-                    case 'snapchat':
-                        // Snapchat doesn't have a direct web sharer like others, 
-                        // usually done via app, but we can provide a copy-link fallback or intent
-                        shareUrl = `https://www.snapchat.com/scan?attachmentUrl=${url}`;
-                        break;
-                    case 'x':
-                        shareUrl = `https://twitter.com/intent/tweet?url=${url}&text=${text}`;
-                        break;
-                }
-
-                if (shareUrl) {
-                    window.open(shareUrl, '_blank', 'width=600,height=400');
-                }
-            }
-        </script>
         <div class="max-w-6xl mx-auto px-4 mt-12 pt-8 border-t border-white/5 text-center text-white/30 text-[10px]">
             &copy; 2026 Doomsdaysnap. All rights reserved. Not affiliated with any social media platforms.
         </div>
