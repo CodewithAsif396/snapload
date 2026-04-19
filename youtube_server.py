@@ -199,6 +199,11 @@ async def stream_with_ffmpeg_merge(video_url: str, audio_url: str, title: str = 
             pass
 
 
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+
 @app.get("/info")
 async def get_info(url: str):
     try:

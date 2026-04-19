@@ -36,6 +36,11 @@ if os.path.exists("static"):
 async def index():
     return FileResponse("static/index.html")
 
+@app.get("/health")
+async def health():
+    import time
+    return {"status": "ok", "uptime": time.time()}
+
 @app.get("/info")
 async def get_info(url: str):
     """
