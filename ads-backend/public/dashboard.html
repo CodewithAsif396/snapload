@@ -323,6 +323,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
     <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
     <h1 class="page-title" id="page-title">Overview</h1>
     <div class="topbar-right">
+      <div id="top-cookie-status" style="margin-right: 0.5rem; display: flex; align-items: center;"></div>
       <div class="admin-badge"><i class="fas fa-shield-halved"></i><span>Admin</span></div>
     </div>
   </header>
@@ -870,6 +871,39 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
           </div>
         </div>
       </div>
+
+      <!-- ── YouTube Cookie Upload ──────────────────────────────────────────── -->
+      <div style="margin-top:1.5rem">
+        <div class="card">
+          <div class="card-header"><i class="fas fa-cookie-bite"></i><h3>YouTube Cookies</h3></div>
+          <p style="font-size:.85rem;color:var(--muted);margin-bottom:1.2rem">
+            Upload fresh <code>cookies.txt</code> daily to keep YouTube downloads working. Export from Chrome using <b>Get cookies.txt LOCALLY</b> extension.
+          </p>
+
+          <!-- Status bar -->
+          <div id="cookie-status-bar" style="padding:.75rem 1rem;border-radius:8px;background:var(--surface2,#1e1e2e);margin-bottom:1.2rem;font-size:.85rem;display:flex;align-items:center;gap:.75rem">
+            <i class="fas fa-spinner fa-spin"></i> <span>Checking cookie status…</span>
+          </div>
+
+          <!-- Upload form -->
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+            <label for="cookie-file-input" style="
+              display:inline-flex;align-items:center;gap:.5rem;
+              background:var(--primary,#7c3aed);color:#fff;
+              padding:.55rem 1.2rem;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600">
+              <i class="fas fa-file-arrow-up"></i> Choose cookies.txt
+            </label>
+            <input type="file" id="cookie-file-input" accept=".txt" style="display:none" onchange="cookieFileSelected(this)">
+            <span id="cookie-filename" style="font-size:.85rem;color:var(--muted)">No file chosen</span>
+            <button onclick="uploadCookies()" id="cookie-upload-btn"
+              style="background:var(--green,#22c55e);color:#fff;border:none;padding:.55rem 1.4rem;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;display:none">
+              <i class="fas fa-upload"></i> Upload
+            </button>
+          </div>
+
+          <div id="cookie-upload-result" style="margin-top:1rem;font-size:.85rem"></div>
+        </div>
+      </div>
     </div>
 
   </main>
@@ -1130,6 +1164,7 @@ let allAds = [];
 
 async function loadOverview() {
   loadQuickActions(); // fire and don't wait
+  loadCookieStatus(); // fire independently
   try {
     const stats = await api('/admin/stats');
     
@@ -1594,9 +1629,94 @@ async function mntApi(path, method = 'GET', body = null) {
 }
 
 async function loadMaintenance() {
+  loadCookieStatus();
   const data = await mntApi('/admin/maintenance');
   if (!data) return;
   renderMntPanel(data);
+}
+
+async function loadCookieStatus() {
+  const bar = document.getElementById('cookie-status-bar');
+  const top = document.getElementById('top-cookie-status');
+  try {
+    const d = await api('/admin/cookies/status');
+    const age = d.age_days;
+    const color = !d.exists ? '#ef4444' : (age < 2 ? '#10b981' : (age < 5 ? '#f59e0b' : '#ef4444'));
+    const icon  = !d.exists ? 'fa-circle-xmark' : (age < 2 ? 'fa-circle-check' : (age < 5 ? 'fa-triangle-exclamation' : 'fa-circle-xmark'));
+    
+    // Update Top Bar
+    if (top) {
+      if (!d.exists) {
+        top.innerHTML = `<span style="color:${color};font-size:.75rem;font-weight:600;background:rgba(239,68,68,0.1);padding:.3rem .6rem;border-radius:6px;border:1px solid rgba(239,68,68,0.2)"><i class="fas ${icon}"></i> No Cookies</span>`;
+      } else {
+        top.innerHTML = `<span style="color:${color};font-size:.75rem;font-weight:600;background:rgba(255,255,255,0.03);padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border)"><i class="fas ${icon}"></i> YT Cookies: ${age}d</span>`;
+      }
+    }
+
+    // Update Maintenance Bar
+    if (bar) {
+      if (!d.exists) {
+        bar.innerHTML = `<i class="fas fa-circle-xmark" style="color:#ef4444"></i> <span style="color:#ef4444">No cookies.txt found — upload one below</span>`;
+      } else {
+        const label = age < 2 ? 'Fresh' : age < 5 ? 'Getting old' : 'Expired — upload now!';
+        bar.innerHTML = `<i class="fas ${icon}" style="color:${color}"></i>
+          <span style="color:${color};font-weight:600">${label}</span>
+          <span style="color:var(--muted);margin-left:.5rem">${age} days old · ${(d.size/1024).toFixed(0)} KB</span>`;
+      }
+    }
+  } catch(e) {
+    if (top) top.innerHTML = `<span style="color:var(--muted);font-size:.75rem"><i class="fas fa-circle-exclamation"></i> Cookie Error</span>`;
+    if (bar) bar.innerHTML = `<i class="fas fa-circle-exclamation" style="color:#f59e0b"></i> <span>Could not reach cookie API</span>`;
+  }
+}
+
+function cookieFileSelected(input) {
+  const name = input.files[0]?.name || 'No file chosen';
+  document.getElementById('cookie-filename').textContent = name;
+  document.getElementById('cookie-upload-btn').style.display = input.files[0] ? 'inline-flex' : 'none';
+}
+
+async function uploadCookies() {
+  const input = document.getElementById('cookie-file-input');
+  const result = document.getElementById('cookie-upload-result');
+  const btn = document.getElementById('cookie-upload-btn');
+  if (!input.files[0]) return;
+
+  const form = new FormData();
+  form.append('cookies', input.files[0]);
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading…';
+  result.innerHTML = '';
+
+  try {
+    const token = localStorage.getItem('adpanel_token');
+    const resp = await fetch('/admin/cookies/upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form
+    });
+    const data = await resp.json();
+    if (data.success) {
+      const validColor = data.valid ? '#22c55e' : '#f59e0b';
+      const validIcon  = data.valid ? 'fa-circle-check' : 'fa-triangle-exclamation';
+      result.innerHTML = `<span style="color:${validColor}"><i class="fas ${validIcon}"></i> ${data.valid ? 'Uploaded & validated!' : 'Uploaded but: ' + data.reason}</span>`;
+      toast(data.valid ? 'Cookies uploaded successfully!' : 'Uploaded — validation warning', data.valid ? 'success' : 'warning');
+      input.value = '';
+      document.getElementById('cookie-filename').textContent = 'No file chosen';
+      loadCookieStatus();
+    } else {
+      result.innerHTML = `<span style="color:#ef4444"><i class="fas fa-circle-xmark"></i> ${data.error}</span>`;
+      toast(data.error, 'error');
+    }
+  } catch(e) {
+    result.innerHTML = `<span style="color:#ef4444">Upload failed: ${e.message}</span>`;
+    toast('Upload failed', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-upload"></i> Upload';
+    btn.style.display = 'none';
+  }
 }
 
 function renderMntPanel(data) {
