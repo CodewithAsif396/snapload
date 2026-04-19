@@ -230,6 +230,58 @@
             background-size: 200% 100%;
             animation: skeleton-pulse 1.5s infinite;
         }
+
+        /* ── Sticky Share Bar Styles ── */
+        .share-bar {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 100;
+        }
+        .share-btn {
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .share-btn:hover {
+            transform: scale(1.1) translateX(5px);
+            border-color: rgba(255,255,255,0.3);
+        }
+        .share-facebook:hover { background: #1877F2; box-shadow: 0 0 20px rgba(24, 119, 242, 0.4); }
+        .share-whatsapp:hover { background: #25D366; box-shadow: 0 0 20px rgba(37, 211, 102, 0.4); }
+        .share-snapchat:hover { background: #FFFC00; color: black; box-shadow: 0 0 20px rgba(255, 252, 0, 0.4); }
+        .share-x:hover { background: #000000; box-shadow: 0 0 20px rgba(255, 255, 255, 0.2); border-color: #fff; }
+
+        @media (max-width: 1024px) {
+            .share-bar {
+                left: 0; right: 0; bottom: 0; top: auto;
+                transform: none;
+                flex-direction: row;
+                justify-content: center;
+                background: rgba(15, 15, 15, 0.8);
+                backdrop-filter: blur(20px);
+                padding: 12px;
+                border-top: 1px solid rgba(255,255,255,0.1);
+                gap: 20px;
+                width: 100%;
+            }
+            .share-btn { width: 42px; height: 42px; }
+            .share-btn:hover { transform: translateY(-5px); }
+            footer { padding-bottom: 80px; } /* Space for mobile share bar */
+        }
     </style>
 </head>
 <body class="antialiased relative min-h-screen flex flex-col font-sans">
@@ -431,10 +483,12 @@
 
 
 
-            <!-- ── Home Page Platform Grid (Redirects) ── -->
             <div id="home-platform-grid" class="mt-16 sm:mt-24">
                 <!-- HOME_PLATFORM_GRID -->
             </div>
+
+            <!-- TOOL_STEPS -->
+            <!-- TOOL_FAQ -->
 
             <p class="text-xs text-gray-600 mt-2">Supports YouTube, TikTok, Instagram, Twitter/X, Facebook, Snapchat &amp; more</p>
         </section>
@@ -526,6 +580,7 @@
 
         <!-- ── SEO Rich Content Section ── -->
         <section id="tool-details" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 scroll-mt-20">
+            <!-- TOOL_RICH_CONTENT -->
         </section>
 
         <!-- ── Other Tools Grid (Cross-Linking) ── -->
@@ -1338,10 +1393,18 @@
         <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-12 text-left">
             <div>
                 <h3 class="text-xl font-bold mb-6 gradient-text">Doomsdaysnap</h3>
-                <p class="text-white/60 text-sm leading-relaxed">
+                <p class="text-white/60 text-sm leading-relaxed mb-6">
                     The world's most advanced multi-platform video downloader. 
                     Download high-quality videos from 7+ platforms without limits.
                 </p>
+                <div class="flex gap-4">
+                    <a href="https://x.com/doomsdaysnap" target="_blank" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:border-white/30 transition-all">
+                        <i class="fa-brands fa-x-twitter"></i>
+                    </a>
+                    <a href="https://github.com/CodewithAsif396/snapload" target="_blank" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:border-white/30 transition-all">
+                        <i class="fa-brands fa-github"></i>
+                    </a>
+                </div>
             </div>
             <div>
                 <h4 class="text-white font-semibold mb-6 text-sm uppercase tracking-wider opacity-90">Supported Platforms</h4>
@@ -1364,6 +1427,51 @@
                 </div>
             </div>
         </div>
+
+        <!-- Sticky Share Bar -->
+        <div class="share-bar reveal active">
+            <a href="#" onclick="sharePlatform('facebook')" class="share-btn share-facebook" title="Share on Facebook">
+                <i class="fa-brands fa-facebook-f"></i>
+            </a>
+            <a href="#" onclick="sharePlatform('whatsapp')" class="share-btn share-whatsapp" title="Share on WhatsApp">
+                <i class="fa-brands fa-whatsapp"></i>
+            </a>
+            <a href="#" onclick="sharePlatform('snapchat')" class="share-btn share-snapchat" title="Share on Snapchat">
+                <i class="fa-brands fa-snapchat"></i>
+            </a>
+            <a href="#" onclick="sharePlatform('x')" class="share-btn share-x" title="Share on X (Twitter)">
+                <i class="fa-brands fa-x-twitter"></i>
+            </a>
+        </div>
+
+        <script>
+            function sharePlatform(platform) {
+                const url = encodeURIComponent(window.location.origin);
+                const text = encodeURIComponent('Download high-quality videos from YouTube, TikTok, and more with Doomsdaysnap! 🔥');
+                let shareUrl = '';
+
+                switch(platform) {
+                    case 'facebook':
+                        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
+                        break;
+                    case 'whatsapp':
+                        shareUrl = `https://api.whatsapp.com/send?text=${text}%20${url}`;
+                        break;
+                    case 'snapchat':
+                        // Snapchat doesn't have a direct web sharer like others, 
+                        // usually done via app, but we can provide a copy-link fallback or intent
+                        shareUrl = `https://www.snapchat.com/scan?attachmentUrl=${url}`;
+                        break;
+                    case 'x':
+                        shareUrl = `https://twitter.com/intent/tweet?url=${url}&text=${text}`;
+                        break;
+                }
+
+                if (shareUrl) {
+                    window.open(shareUrl, '_blank', 'width=600,height=400');
+                }
+            }
+        </script>
         <div class="max-w-6xl mx-auto px-4 mt-12 pt-8 border-t border-white/5 text-center text-white/30 text-[10px]">
             &copy; 2026 Doomsdaysnap. All rights reserved. Not affiliated with any social media platforms.
         </div>

@@ -362,57 +362,99 @@ app.get('/', (_req, res) => {
     fs.readFile(path.join(__dirname, 'app.html'), 'utf8', (err, data) => {
         if (err) return res.status(500).send('Error');
         
-        // Hide small tab row for home page
+        // Hide small tab row for home page but KEEP the main search interaction
         let modified = data.replace('id="platform-tabs-row"', 'id="platform-tabs-row" style="display:none !important"');
         
-        // Hide downloader input on home page as per user request (Selection hub only)
-        modified = modified.replace('id="downloader-input-section"', 'id="downloader-input-section" style="display:none !important"');
-        modified = modified.replace('id="mobile-paste-sample-row"', 'id="mobile-paste-sample-row" style="display:none !important"');
+        // Restore essential sections for Home Page functionality
+        // (Previously hidden for 'Selection Hub' mode)
+        modified = modified.replace('id="downloader-input-section" style="display:none !important"', 'id="downloader-input-section"');
+        modified = modified.replace('id="mobile-paste-sample-row" style="display:none !important"', 'id="mobile-paste-sample-row"');
         
-        // Generate Large Premium Grid for Home Page
-        const gridHtml = `
-            <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-8 lg:gap-10 stagger-reveal">
-                ${Object.keys(PLATFORM_SEO_DATA).map(key => {
-                    const p = PLATFORM_SEO_DATA[key];
-                    const name = key.split('-')[0].charAt(0).toUpperCase() + key.split('-')[0].slice(1);
-                    return `
-                        <a href="/${key}" class="group relative flex flex-col items-center justify-center p-4 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] glass-card border border-white/5 hover:border-purple-500/30 transition-all duration-700 hover-lift overflow-hidden stagger-item">
-                            <!-- Animated Background Glow -->
-                            <div class="absolute -inset-2 bg-gradient-to-br ${p.bg.replace('10', '40')} blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                            
-                            <!-- Card Content -->
-                            <div class="relative z-10 w-14 h-14 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl ${p.bg} flex items-center justify-center mb-4 sm:mb-8 transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 shadow-2xl shadow-black/40 border border-white/10">
-                                <i class="fa-brands ${p.icon} text-3xl sm:text-5xl ${p.color} drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]"></i>
-                            </div>
-                            
-                            <h3 class="relative z-10 text-lg sm:text-2xl font-black text-white mb-1 sm:mb-2 group-hover:text-purple-400 transition-colors tracking-tight">${name}</h3>
-                            <div class="relative z-10 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full bg-white/5 border border-white/5 group-hover:bg-purple-500/10 group-hover:border-purple-500/20 transition-all">
-                                <span class="text-[8px] sm:text-[10px] text-gray-400 uppercase tracking-[0.1em] sm:tracking-[0.2em] font-bold">Fast Download</span>
-                                <i class="fa-solid fa-circle-check text-[8px] sm:text-[10px] text-purple-400"></i>
-                            </div>
-                            
-                            <!-- Corner Accent -->
-                            <div class="absolute -bottom-6 -right-6 w-14 h-14 sm:w-20 sm:h-20 bg-gradient-to-br ${p.bg.replace('10', '30')} rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-700"></div>
-                            <div class="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 text-white/10 group-hover:text-purple-500/40 transform translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-500">
-                                <i class="fa-solid fa-arrow-right-long text-xl sm:text-2xl"></i>
-                            </div>
-                        </a>
-                    `;
-                }).join('')}
-            </div>
-        `;
-        
-        modified = modified.replace('<!-- HOME_PLATFORM_GRID -->', gridHtml);
-        
-        // Ensure tool-specific sections are empty on home page
+        // Clear sections that are not needed on home page
+        modified = modified.replace('<!-- HOME_PLATFORM_GRID -->', '');
         modified = modified.replace('<!-- TOOL_STEPS -->', '');
         modified = modified.replace('<!-- TOOL_FAQ -->', '');
         modified = modified.replace('<!-- TOOL_GRID_ITEMS -->', '');
         modified = modified.replace('<!-- TOOL_RICH_CONTENT -->', '');
+        modified = modified.replace('<!-- LEGAL_CONTENT -->', '');
         
         res.send(modified);
     });
 });
+
+// ─── Legal Pages ─────────────────────────────────────────────────────────────
+const LEGAL_DATA = {
+    'privacy': {
+        title: 'Privacy Policy | Doomsdaysnap',
+        desc: 'Learn about how Doomsdaysnap handles privacy and data protection.',
+        h1: 'Privacy Policy',
+        content: `
+            <div class="prose prose-invert max-w-none space-y-8">
+                <section>
+                    <h2 class="text-2xl font-bold text-white mb-4">1. Data Collection</h2>
+                    <p class="text-gray-400 leading-relaxed">Doomsdaysnap is a privacy-first platform. We do NOT store personal data, IP addresses, or video download history on our servers. All video processing is performed in temporary memory and never persisted.</p>
+                </section>
+                <section>
+                    <h2 class="text-2xl font-bold text-white mb-4">2. Cookies & Analytics</h2>
+                    <p class="text-gray-400 leading-relaxed">We use standard Google Analytics to understand platform performance. No personally identifiable information is shared with third parties. You can opt-out by disabling cookies in your browser.</p>
+                </section>
+                <section>
+                    <h2 class="text-2xl font-bold text-white mb-4">3. External Links</h2>
+                    <p class="text-gray-400 leading-relaxed">Our service allows you to download content from third-party platforms like YouTube and TikTok. We are not responsible for the privacy practices of those external sites.</p>
+                </section>
+            </div>
+        `
+    },
+    'tos': {
+        title: 'Terms of Service | Doomsdaysnap',
+        desc: 'Read the terms and conditions for using Doomsdaysnap services.',
+        h1: 'Terms of Service',
+        content: `
+            <div class="prose prose-invert max-w-none space-y-8">
+                <section>
+                    <h2 class="text-2xl font-bold text-white mb-4">1. Service Usage</h2>
+                    <p class="text-gray-400 leading-relaxed">Doomsdaysnap provides a tool to download publicly available media. By using this service, you agree to comply with all applicable copyright laws and regulations.</p>
+                </section>
+                <section>
+                    <h2 class="text-2xl font-bold text-white mb-4">2. Personal Use</h2>
+                    <p class="text-gray-400 leading-relaxed">Our service is intended for personal, non-commercial use only. You may not use this platform to bypass encryption or access private content.</p>
+                </section>
+                <section>
+                    <h2 class="text-2xl font-bold text-white mb-4">3. Disclaimer</h2>
+                    <p class="text-gray-400 leading-relaxed">The service is provided "as is" without warranty of any kind. Doomsdaysnap is not affiliated with YouTube, TikTok, Facebook, or any other social media platform.</p>
+                </section>
+            </div>
+        `
+    }
+};
+
+['privacy', 'tos'].forEach(slug => {
+    app.get(\`/\${slug}\`, (req, res) => {
+        const legal = LEGAL_DATA[slug];
+        fs.readFile(path.join(__dirname, 'app.html'), 'utf8', (err, data) => {
+            if (err) return res.status(500).send('Error');
+            
+            let modified = data
+                .replace(/<title>.*?<\/title>/, \`<title>\${legal.title}</title>\`)
+                .replace(/<meta name="description" content=".*?">/, \`<meta name="description" content="\${legal.desc}">\`)
+                .replace('id="downloader-input-section"', 'id="downloader-input-section" style="display:none !important"')
+                .replace('id="mobile-paste-sample-row"', 'id="mobile-paste-sample-row" style="display:none !important"')
+                .replace('<!-- HOME_PLATFORM_GRID -->', '')
+                .replace('<!-- TOOL_STEPS -->', '')
+                .replace('<!-- TOOL_FAQ -->', '')
+                .replace('<!-- TOOL_GRID_ITEMS -->', '')
+                .replace('<!-- TOOL_RICH_CONTENT -->', \`
+                    <div class="max-w-4xl mx-auto py-20 px-6 bg-white/5 rounded-[2rem] border border-white/10 backdrop-blur-xl">
+                        <h1 class="text-4xl sm:text-6xl font-black text-white mb-12 gradient-text">\${legal.h1}</h1>
+                        \${legal.content}
+                    </div>
+                \`);
+            
+            res.send(modified);
+        });
+    });
+});
+
 
 app.get('/app', (_req, res) => {
     res.redirect(301, '/');
