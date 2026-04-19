@@ -8,27 +8,8 @@ const https      = require('https');
 const isWin = process.platform === 'win32';
 
 // Robust yt-dlp detection (align with server.js)
-function getYTdlpPath() {
-    // Check root directory
-    const rootPath = path.join(__dirname, '..', isWin ? 'yt-dlp.exe' : 'yt-dlp');
-    if (fs.existsSync(rootPath)) return rootPath;
+const YTDLP_BIN = 'python'; // Always use python module for reliability in 2026
 
-    // System common paths
-    const systemPaths = isWin 
-        ? ['C:\\Program Files\\yt-dlp\\yt-dlp.exe', 'C:\\yt-dlp.exe']
-        : ['/usr/local/bin/yt-dlp', '/usr/bin/yt-dlp'];
-    
-    for (const p of systemPaths) {
-        if (fs.existsSync(p)) return p;
-    }
-
-    // Fallback to node_modules
-    return isWin
-        ? path.join(__dirname, '..', 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe')
-        : path.join(__dirname, '..', 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp');
-}
-
-const YTDLP_BIN = getYTdlpPath();
 
 // Cookies file detection — check multiple possible names (browser export adds " (1)" suffix)
 function findCookiesFile() {
@@ -143,6 +124,7 @@ class BaseProvider {
 
         return new Promise((resolve, reject) => {
             const args = [
+                '-m', 'yt_dlp', // Launch as python module
                 url,
                 '--dump-single-json',
                 '--no-warnings',
@@ -152,6 +134,7 @@ class BaseProvider {
                 '--geo-bypass',
                 '--ffmpeg-location', ffmpegPath,
             ];
+
 
             // Add standard Cookies if available
             if (COOKIES_ARG) args.push('--cookies', COOKIES_ARG);

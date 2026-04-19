@@ -79,31 +79,9 @@ const PORT = process.env.PORT || 3000;
 const isWin = process.platform === 'win32';
 
 // Robust yt-dlp detection
-function getYTdlpPath() {
-    // 1. Check if 'yt-dlp' is in system PATH (via 'where' or 'which')
-    // Note: In Node, we can just try to run 'yt-dlp' and see if it fails,
-    // but for absolute paths in spawn, we check common locations.
-    
-    // 2. Check root directory (manual upload)
-    const rootPath = path.join(__dirname, isWin ? 'yt-dlp.exe' : 'yt-dlp');
-    if (require('fs').existsSync(rootPath)) return rootPath;
+const YTDLP = 'python'; // Always use python module for reliability in 2026
+const YTDLP_IS_MODULE = true; 
 
-    // 3. System common paths
-    const systemPaths = isWin 
-        ? ['C:\\Program Files\\yt-dlp\\yt-dlp.exe', 'C:\\yt-dlp.exe']
-        : ['/usr/local/bin/yt-dlp', '/usr/bin/yt-dlp'];
-    
-    for (const p of systemPaths) {
-        if (require('fs').existsSync(p)) return p;
-    }
-
-    // 4. Fallback to node_modules (bundled)
-    return isWin
-        ? path.join(__dirname, 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe')
-        : path.join(__dirname, 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp');
-}
-
-const YTDLP = getYTdlpPath();
 
 // Cookies file detection (must be netscape format)
 // Check multiple possible filenames (browser exports often add " (1)" suffix)
@@ -1012,7 +990,7 @@ app.get('/api/download', rateLimit, async (req, res) => {
     // ── YouTube Hybrid Pro Download ──
     if (isYouTube) {
         console.log(`[DOWNLOAD] YouTube Hybrid Pro Pipe → ${safeUrl.slice(0, 60)}`);
-        const pyUrl = `http://127.0.0.1:5002/download?url=${encodeURIComponent(safeUrl)}${fid ? `&fid=${fid}` : ''}`;
+        const pyUrl = `http://127.0.0.1:5002/download?url=${encodeURIComponent(safeUrl)}${type ? `&height=${type}` : ''}`;
         
         const pyReq = http.get(pyUrl, (pyRes) => {
             if (pyRes.statusCode !== 200) {
