@@ -1,20 +1,24 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 
-pip3 install -q flask requests gunicorn
+# ─── Environment Setup ──────────────────────────────────────────────────────────
+pip3 install -q flask requests gunicorn uvicorn yt-dlp
 
-# TikTok Flask server (port 5000)
-gunicorn --bind 127.0.0.1:5000 tiktok_server:app --daemon --log-file /tmp/tiktok_flask.log
-echo "TikTok Flask started on port 5000"
+# ─── Process Management (PM2) ───────────────────────────────────────────────────
+# We use PM2 Ecosystem for centralized logging and 45-minute auto-restarts.
+# To start everything: ./start.sh
+# To monitor: pm2 list
+# To check logs: pm2 logs
 
-# Social Flask server (port 5001)
-gunicorn --bind 127.0.0.1:5001 social_server:app --daemon --log-file /tmp/social_flask.log
-# TikTok Flask started on port 5000
-# Social Flask started on port 5001
+pm2 start ecosystem.config.js --env production
 
-# YouTube FastAPI server (port 5002) - Hybrid Pro High Speed Engine
-uvicorn youtube_server:app --port 5002 --host 127.0.0.1 > /tmp/youtube_fastapi.log 2>&1 &
-echo "YouTube Hybrid Pro started on port 5002"
+echo "----------------------------------------------------------------"
+echo "🚀 Doomsdaysnap Ecosystem Started!"
+echo "🔄 All services configured to refresh every 45 minutes."
+echo "----------------------------------------------------------------"
 
-# Node.js server
-node server.js
+# Legacy manual startup (commented out as requested - do not delete)
+# gunicorn --bind 127.0.0.1:5000 tiktok_server:app --daemon --log-file /tmp/tiktok_flask.log
+# gunicorn --bind 127.0.0.1:5001 social_server:app --daemon --log-file /tmp/social_flask.log
+# uvicorn youtube_server:app --port 5002 --host 127.0.0.1 > /tmp/youtube_fastapi.log 2>&1 &
+# node server.js
