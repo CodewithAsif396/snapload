@@ -497,8 +497,8 @@
 
                         <h4 class="text-gray-300 text-[10px] sm:text-xs font-semibold uppercase tracking-widest mb-1">Available Formats</h4>
                         <p class="text-[9px] sm:text-[10px] text-purple-400/80 mb-4 flex items-center gap-1.5">
-                            <i class="fa-solid fa-circle-info text-[8px]"></i> 
-                            Note: Downloading will start 3-5 seconds after clicking the button.
+                            <i class="fa-solid fa-bolt text-[8px]"></i> 
+                            High-speed extraction enabled. Your download will start immediately.
                         </p>
                         <div id="res-formats" class="space-y-2.5"></div>
 
@@ -670,38 +670,34 @@
         
         btn.classList.add('processing', 'opacity-50');
         btn.style.pointerEvents = 'none';
-        statusBox.classList.remove('hidden');
-        
-        let timeLeft = 5;
         const originalHtml = btn.innerHTML;
         
-        const timer = setInterval(() => {
-            btn.innerHTML = `<i class="fa-solid fa-clock animate-spin"></i> ${timeLeft}s`;
-            statusBox.innerHTML = `<span class="animate-pulse">Preparing high-quality file... ${timeLeft}s</span>`;
-            
-            if (timeLeft <= 0) {
-                clearInterval(timer);
-                btn.innerHTML = `<i class="fa-solid fa-check"></i>`;
-                statusBox.innerHTML = `<span class="text-green-400"><i class="fa-solid fa-circle-check"></i> Download Started!</span>`;
-                
-                if (window.trackEvent) trackEvent('download');
-                
-                const a = document.createElement('a');
-                a.href = url;
-                a.target = '_blank';
-                a.download = '';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+        btn.innerHTML = `<i class="fa-solid fa-clock animate-spin"></i>`;
+        statusBox.classList.remove('hidden');
+        statusBox.innerHTML = `<span class="animate-pulse">Requesting final file...</span>`;
+        
+        // Trigger download immediately
+        if (window.trackEvent) trackEvent('download');
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
 
-                setTimeout(() => {
-                    btn.innerHTML = originalHtml;
-                    btn.classList.remove('processing', 'opacity-50');
-                    btn.style.pointerEvents = 'auto';
-                    statusBox.classList.add('hidden');
-                }, 4000);
-            }
-            timeLeft--;
+        // Success state
+        setTimeout(() => {
+            btn.innerHTML = `<i class="fa-solid fa-check"></i>`;
+            statusBox.innerHTML = `<span class="text-green-400"><i class="fa-solid fa-circle-check"></i> Download Started!</span>`;
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.classList.remove('processing', 'opacity-50');
+                btn.style.pointerEvents = 'auto';
+                statusBox.classList.add('hidden');
+            }, 3000);
         }, 1000);
     }
 
