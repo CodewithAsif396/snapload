@@ -1,7 +1,5 @@
-flask
-requests
-gunicorn
 fastapi
 uvicorn
-yt-dlp
+pytubefix
 httpx
+yt-dlp

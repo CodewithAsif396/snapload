@@ -32,6 +32,12 @@ YDL_BASE_OPTS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept-Language': 'en-US,en;q=0.9',
         'Referer': 'https://www.youtube.com/',
+    },
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'ios', 'web', 'mweb', 'web_embedded'],
+            'po_token': ['web+PO_TOKEN', 'ios+PO_TOKEN'] # Placeholder for future PO Token integration
+        }
     }
 }
 
@@ -52,13 +58,25 @@ FFMPEG_PATH = os.environ.get("FFMPEG_PATH", "ffmpeg")
 class ExplodeEngine:
     @staticmethod
     async def get_info(url: str):
+        # Merge formats to get both adaptive and progressive
         opts = {**YDL_BASE_OPTS, 'format': 'bestvideo+bestaudio/best'}
 
         def extract():
             with yt_dlp.YoutubeDL(opts) as ydl:
                 return ydl.extract_info(url, download=False)
 
-        info = await asyncio.to_thread(extract)
+        try:
+            info = await asyncio.to_thread(extract)
+        except Exception as e:
+            err_msg = str(e)
+            if "Sign in to confirm you’re not a bot" in err_msg:
+                raise Exception("BOT_DETECTION_TRIGGERED: YouTube is blocking this request. Try clearing cookies or updating the server.")
+            if "Private video" in err_msg:
+                raise Exception("This video is private.")
+            if "Incomplete YouTube ID" in err_msg or "is not a valid URL" in err_msg:
+                raise Exception("Invalid YouTube URL.")
+            raise e
+
         if not info:
             raise Exception("Could not extract metadata.")
 

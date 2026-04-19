@@ -880,7 +880,9 @@ app.post('/api/info', rateLimit, async (req, res) => {
                 return res.json({ ...response, originalUrl: url });
             } catch (err) {
                 console.error('[YouTube Engine Error]:', err.message);
-                // Fallback to legacy if needed or just error
+                if (err.code === 'ECONNREFUSED') {
+                    throw new Error('YouTube Hybrid Pro Engine (Port 5002) is currently offline. Please run start_all.bat to start it.');
+                }
                 throw err;
             }
         }
@@ -916,8 +918,10 @@ app.post('/api/info', rateLimit, async (req, res) => {
         console.error('[INFO Error]:', err.message);
         let msg = 'Could not extract video info. The link may be invalid or private.';
         const m = err.message || '';
-        if (m.includes('Private video'))                          msg = 'This video is private.';
+        if (m.includes('BOT_DETECTION_TRIGGERED'))                msg = 'YouTube is blocking this request (Bot Detection). Try again later or update cookies.';
+        else if (m.includes('Private video'))                     msg = 'This video is private.';
         else if (m.includes('age'))                               msg = 'Age-restricted content cannot be downloaded.';
+        else if (m.includes('offline'))                           msg = m; // Pass through the "engine offline" message
         else if (m.includes('Sign in to confirm'))                msg = 'YouTube has blocked this request (Bot detection). Try again later.';
         else if (m.includes('not available in your country') || m.includes('blocked in your country')) msg = 'This video is not available in your region.';
         else if (m.includes('HTTP Error 404'))                    msg = 'Video not found — please check the URL.';
