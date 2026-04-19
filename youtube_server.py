@@ -132,12 +132,30 @@ class ExplodeEngine:
                 "fid": f.get("format_id")
             })
 
+        # Fallback: progressive formats (Twitter/X, Instagram, etc.)
+        if not formatted_formats:
+            prog = [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none' and f.get('height')]
+            prog = sorted(prog, key=lambda x: x.get('height', 0) or 0, reverse=True)
+            seen_h = set()
+            for f in prog:
+                h = f.get('height')
+                if h and h not in seen_h:
+                    seen_h.add(h)
+                    sz = f.get('filesize') or f.get('filesize_approx') or 0
+                    formatted_formats.append({
+                        "height": h,
+                        "ext": f.get('ext', 'mp4'),
+                        "size": sz or None,
+                        "fid": f.get("format_id")
+                    })
+
+        provider = info.get("extractor_key", "youtube").lower()
         return {
-            "title": info.get("title", "YouTube Video"),
+            "title": info.get("title", ""),
             "thumbnail": info.get("thumbnail", ""),
             "duration": info.get("duration_string", "0:00"),
             "formats": formatted_formats,
-            "provider": "youtube"
+            "provider": provider
         }
 
 
@@ -160,6 +178,8 @@ async def get_info(url: str):
 import tempfile
 import glob as glob_mod
 
+FFMPEG_LOCATION = os.environ.get("FFMPEG_PATH", None)  # set on VPS if ffmpeg not in PATH
+
 async def download_and_stream(url: str, fmt: str, safe_title: str):
     """Download to temp file via yt-dlp, then stream to browser, then delete."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -172,13 +192,19 @@ async def download_and_stream(url: str, fmt: str, safe_title: str):
             'merge_output_format': 'mp4',
             'postprocessors': [],
         }
+        if FFMPEG_LOCATION:
+            opts['ffmpeg_location'] = FFMPEG_LOCATION
 
         def do_download():
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
 
         print(f"[DOWNLOAD] Starting: {safe_title} | fmt={fmt}")
-        await asyncio.to_thread(do_download)
+        try:
+            await asyncio.to_thread(do_download)
+        except Exception as e:
+            print(f"[DOWNLOAD ERROR] {e}")
+            raise
 
         # Find the output file
         files = glob_mod.glob(os.path.join(tmpdir, '*'))
@@ -199,19 +225,34 @@ async def download_and_stream(url: str, fmt: str, safe_title: str):
 
 
 @app.get("/download")
-async def download(url: str, height: Optional[str] = None):
+async def download(url: str, height: Optional[str] = None, type: Optional[str] = None):
     try:
-        h = int(height) if height else None
-        fmt = f'bestvideo[height<={h}]+bestaudio/best[height<={h}]' if h else 'bestvideo+bestaudio/best'
+        # Support both ?height=1080 and ?type=1080 (frontend compat)
+        raw = height or type
+        is_audio = raw == 'audio'
+        h = None if (not raw or is_audio) else int(raw)
+
+        if is_audio:
+            fmt = 'bestaudio/best'
+        elif h:
+            fmt = f'bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={h}]+bestaudio/best[height<={h}]'
+        else:
+            fmt = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best'
 
         def get_title():
-            with yt_dlp.YoutubeDL({**YDL_BASE_OPTS, 'format': fmt}) as ydl:
+            with yt_dlp.YoutubeDL({**YDL_BASE_OPTS, 'quiet': True}) as ydl:
                 info = ydl.extract_info(url, download=False)
                 return (info or {}).get('title', 'video')
 
         title = await asyncio.to_thread(get_title)
         safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip() or "doomsdaysnap"
 
+        if is_audio:
+            return StreamingResponse(
+                download_and_stream(url, fmt, safe_title),
+                media_type="audio/mpeg",
+                headers={"Content-Disposition": f'attachment; filename="{safe_title}.mp3"'}
+            )
         return StreamingResponse(
             download_and_stream(url, fmt, safe_title),
             media_type="video/mp4",
