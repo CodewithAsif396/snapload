@@ -288,11 +288,6 @@
     </style>
 </head>
 <body class="antialiased relative min-h-screen flex flex-col font-sans">
-    <script>
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '3000') {
-            document.write('<style>#security-overlay { display: none !important; }</style>');
-        }
-    </script>
     <!-- Cloudflare-style Security Challenge -->
     <div id="security-overlay">
         <div class="security-shield">
@@ -898,7 +893,7 @@
         }
 
         // Auto-bypass for localhost testing
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '3000') {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
             document.addEventListener('DOMContentLoaded', function() {
                 var overlay = document.getElementById('security-overlay');
                 if (overlay) {
