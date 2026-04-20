@@ -1269,9 +1269,8 @@
             const modal = document.getElementById('hd-modal');
             const vBtn = document.getElementById('hd-video-btn');
             const aBtn = document.getElementById('hd-audio-btn');
-            const label = document.getElementById('hd-video-label');
 
-            label.textContent = 'Download Video (' + quality + ')';
+            vBtn.innerHTML = '<i class="fa-solid fa-arrow-down-long"></i> ⬇ Download Video (' + quality + ')';
             vBtn.dataset.url = vUrl;
             aBtn.dataset.url = aUrl;
 
