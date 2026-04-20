@@ -104,9 +104,9 @@ class BaseProvider {
                     height: h,
                     ext:    'mp4',
                     size:   f.filesize || f.filesize_approx || null,
-                    // Store the exact yt-dlp format ID so the download route
-                    // can request this precise stream instead of guessing by height.
                     fid:    f.format_id || null,
+                    url:    f.url || null,
+                    progressive: true
                 });
             }
         }

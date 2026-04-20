@@ -3,3 +3,5 @@ uvicorn
 pytubefix
 httpx
 yt-dlp
+flask
+requests

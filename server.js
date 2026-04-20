@@ -1476,12 +1476,16 @@ async function fetchVideo() {
             </span>
           </div>
         </div>
-        <div class="mt-5">
-          <a href="/proxy?url=\${encodeURIComponent(data.video_url)}&session="
+        <div class="mt-5 space-y-3">
+          <a href="\${data.video_url}"
              class="btn-dl w-full flex items-center justify-center gap-2 text-white font-bold py-4 rounded-xl text-base"
-             download="tiktok_original.mp4">
-            <i class="fa-solid fa-download"></i>
-            Download Original MP4
+             target="_blank">
+            <i class="fa-solid fa-download"></i> Download Direct (HD)
+          </a>
+          <a href="/proxy?url=\${encodeURIComponent(data.video_url)}"
+             class="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white transition py-2 text-sm"
+             target="_blank">
+            <i class="fa-solid fa-server"></i> Server Proxy Fallback
           </a>
         </div>
       </div>

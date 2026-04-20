@@ -73,9 +73,14 @@ HTML_PAGE = """
                     <img src="${data.cover}" alt="cover">
                     <h3>${data.title}</h3>
                     <p style="color:#aaa;">@${data.author} &nbsp;|&nbsp; Size: ${data.size_mb} MB &nbsp;|&nbsp; Quality: ${data.quality}</p>
-                    <a class="btn-dl" href="/proxy?url=${encodeURIComponent(data.video_url)}&session=${encodeURIComponent(data.session_id || '')}" target="_blank">
-                        Download Original MP4
+                    <a class="btn-dl" href="${data.video_url}" target="_blank">
+                        Download Original MP4 (Direct)
                     </a>
+                    <p style="margin-top:10px;">
+                        <a href="/proxy?url=${encodeURIComponent(data.video_url)}&session=${encodeURIComponent(data.session_id || '')}" style="color:#aaa; font-size:12px; text-decoration:underline;">
+                            Download failing? Try via Proxy
+                        </a>
+                    </p>
                 </div>
             `;
         }
@@ -226,7 +231,7 @@ def proxy():
     r = requests.get(video_url, headers=headers, stream=True, timeout=30)
 
     return Response(
-        r.iter_content(chunk_size=1024 * 64),
+        r.iter_content(chunk_size=1024 * 1024),
         status=r.status_code,
         headers={
             "Content-Type": "video/mp4",

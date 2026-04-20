@@ -288,7 +288,11 @@
     </style>
 </head>
 <body class="antialiased relative min-h-screen flex flex-col font-sans">
-
+    <script>
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '3000') {
+            document.write('<style>#security-overlay { display: none !important; }</style>');
+        }
+    </script>
     <!-- Cloudflare-style Security Challenge -->
     <div id="security-overlay">
         <div class="security-shield">
@@ -301,6 +305,67 @@
         <div class="cf-turnstile" data-sitekey="0x4AAAAAAC_YIEqz3i3KKqsS" data-callback="onChallengeSuccess" data-theme="dark"></div>
         
         <p class="text-gray-500 text-[10px] mt-10 uppercase tracking-[0.2em]">Verifying browser integrity</p>
+    </div>
+
+    <!-- HD Download Modal -->
+    <div id="hd-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="closeHDModal()"></div>
+        <div class="glass relative w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/10 transform scale-95 transition-all duration-300">
+            <button onclick="closeHDModal()" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-purple-500/30">
+                    <i class="fa-solid fa-film text-3xl text-purple-400"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-white mb-2">HD Download — Video + Audio</h2>
+                <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-left">
+                    <p class="text-blue-300 text-xs sm:text-sm leading-relaxed">
+                        <i class="fa-solid fa-circle-info mr-2"></i>
+                        YouTube provides HD videos as separate video and audio files. 
+                        Please download both files below, then merge them using any video merger tool.
+                    </p>
+                    <p class="text-gray-400 text-[10px] sm:text-[11px] mt-3 uppercase tracking-wider">
+                        Recommended: <a href="https://cloudconvert.com/merge-video" target="_blank" class="text-purple-400 hover:underline">Free Online Merger <i class="fa-solid fa-up-right-from-square ml-1 text-[8px]"></i></a>
+                    </p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:bg-white/10 transition-all">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                            <i class="fa-solid fa-video"></i>
+                        </div>
+                        <div>
+                            <p id="hd-video-label" class="text-white font-semibold text-sm">Download Video</p>
+                            <p class="text-gray-500 text-[10px] uppercase tracking-widest">Video Stream (No Audio)</p>
+                        </div>
+                    </div>
+                    <button id="hd-video-btn" data-url="" onclick="triggerDownload(this, this.dataset.url)" class="gradient-bg text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-purple-500/20 active:scale-95 transition-all">
+                        <i class="fa-solid fa-arrow-down-long mr-2"></i> Get Video
+                    </button>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:bg-white/10 transition-all">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400">
+                            <i class="fa-solid fa-music"></i>
+                        </div>
+                        <div>
+                            <p class="text-white font-semibold text-sm">Download Audio</p>
+                            <p class="text-gray-500 text-[10px] uppercase tracking-widest">High Quality M4A/MP3</p>
+                        </div>
+                    </div>
+                    <button id="hd-audio-btn" data-url="" onclick="triggerDownload(this, this.dataset.url)" class="bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all">
+                        <i class="fa-solid fa-headphones mr-2"></i> Get Audio
+                    </button>
+                </div>
+            </div>
+
+            <p class="text-center text-gray-500 text-[10px] mt-6 uppercase tracking-[0.2em]">Quality ensured by Doomsdaysnap</p>
+        </div>
     </div>
 
     <!-- Announcement Banner (controlled by AdPanel) -->
@@ -728,43 +793,76 @@
     }
 
     // ── Download Timer Logic (Global) ────────────────────────────────────
-    function triggerDownload(btn, url) {
+    async function triggerDownload(btn, url) {
         if (btn.classList.contains('processing')) return;
         
         const row = btn.closest('.format-row');
-        const statusBox = row.querySelector('.dl-status');
+        const statusBox = row ? row.querySelector('.dl-status') : null;
         
         btn.classList.add('processing', 'opacity-50');
         btn.style.pointerEvents = 'none';
         const originalHtml = btn.innerHTML;
         
         btn.innerHTML = `<i class="fa-solid fa-clock animate-spin"></i>`;
-        statusBox.classList.remove('hidden');
-        statusBox.innerHTML = `<span class="animate-pulse">Requesting final file...</span>`;
+        if (statusBox) {
+            statusBox.classList.remove('hidden');
+            statusBox.innerHTML = `<span class="animate-pulse">Requesting final file...</span>`;
+        }
         
-        // Trigger download immediately
         if (window.trackEvent) trackEvent('download');
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        a.download = '';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
 
-        // Success state
-        setTimeout(() => {
-            btn.innerHTML = `<i class="fa-solid fa-check"></i>`;
-            statusBox.innerHTML = `<span class="text-green-400"><i class="fa-solid fa-circle-check"></i> Download Started!</span>`;
-            
+        try {
+            // If it's a direct CDN link (starts with http) and NOT our own API
+            if (url.startsWith('http') && !url.includes(window.location.host)) {
+                try {
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error("CORS or CDN block");
+                    const blob = await resp.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = "doomsdaysnap_video_" + Date.now() + ".mp4";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(blobUrl);
+                } catch (e) {
+                    console.warn("Direct fetch failed (CORS), opening in new tab", e);
+                    window.open(url, '_blank');
+                }
+            } else {
+                // Fallback to our own API (proxy/download)
+                const a = document.createElement('a');
+                a.href = url;
+                a.target = '_blank';
+                a.download = '';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+
+            // Success state
+            setTimeout(() => {
+                btn.innerHTML = `<i class="fa-solid fa-check"></i>`;
+                if (statusBox) statusBox.innerHTML = `<span class="text-green-400"><i class="fa-solid fa-circle-check"></i> Download Started!</span>`;
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.classList.remove('processing', 'opacity-50');
+                    btn.style.pointerEvents = 'auto';
+                    if (statusBox) statusBox.classList.add('hidden');
+                }, 3000);
+            }, 1000);
+        } catch (err) {
+            console.error("Download trigger error:", err);
+            btn.innerHTML = `<i class="fa-solid fa-xmark"></i>`;
+            statusBox.innerHTML = `<span class="text-red-400">Download Failed</span>`;
             setTimeout(() => {
                 btn.innerHTML = originalHtml;
                 btn.classList.remove('processing', 'opacity-50');
                 btn.style.pointerEvents = 'auto';
-                statusBox.classList.add('hidden');
             }, 3000);
-        }, 1000);
+        }
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -782,7 +880,10 @@
             var overlay = document.getElementById('security-overlay');
             if (!overlay) return;
             
-            // Show success state
+            completeChallenge(overlay);
+        };
+
+        function completeChallenge(overlay) {
             var title = overlay.querySelector('h2');
             if (title) title.textContent = 'Identity Verified!';
             
@@ -790,12 +891,23 @@
                 overlay.style.opacity = '0';
                 overlay.style.visibility = 'hidden';
                 sessionStorage.setItem('security_check_passed', 'true');
-                
                 setTimeout(function() {
                     overlay.remove();
-                }, 800);
-            }, 1000);
-        };
+                }, 500);
+            }, 800);
+        }
+
+        // Auto-bypass for localhost testing
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '3000') {
+            document.addEventListener('DOMContentLoaded', function() {
+                var overlay = document.getElementById('security-overlay');
+                if (overlay) {
+                    console.log('Localhost detected - bypassing security check');
+                    completeChallenge(overlay);
+                }
+            });
+        }
+
     })();
 
     // ── Toast System ─────────────────────────────────────────────────────
@@ -1131,12 +1243,16 @@
         }
 
         // ── Build Format Row ─────────────────────────────────────────────────
-        function buildFormatRow(title, desc, iconName, colorClass, dlUrl, badge) {
-            if (!dlUrl) return '';
+        function buildFormatRow(title, desc, iconName, colorClass, dlUrl, badge, hdData = null) {
+            if (!dlUrl && !hdData) return '';
             var badgeHtml = badge
                 ? '<span class="ml-2 text-[9px] sm:text-[10px] py-0.5 px-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full text-white font-bold">' + badge + '</span>'
                 : '';
             
+            var clickHandler = hdData 
+                ? 'openHDModal(\'' + hdData.vUrl + '\', \'' + hdData.aUrl + '\', \'' + title + '\')'
+                : 'triggerDownload(this, \'' + dlUrl + '\')';
+
             return '<div class="format-row group/item">' +
                    '<div class="flex items-center justify-between glass-card p-2.5 sm:p-4 rounded-xl sm:rounded-2xl hover:bg-white/5 transition-all">'
                 + '<div class="flex items-center gap-3 sm:gap-4">'
@@ -1148,7 +1264,7 @@
                 + '<p class="text-[10px] sm:text-[11px] text-gray-400 sm:text-gray-500 uppercase tracking-wider mt-0.5">' + desc + '</p>'
                 + '</div>'
                 + '</div>'
-                + '<button onclick="triggerDownload(this, \'' + dlUrl + '\')"'
+                + '<button onclick="' + clickHandler + '"'
                 + ' class="gradient-bg text-white px-2.5 py-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-sm flex items-center gap-2 shadow-lg hover:shadow-purple-500/20 active:scale-95 transition-all flex-shrink-0">'
                 + '<i class="fa-solid fa-arrow-down-long"></i><span class="hidden sm:inline">Download</span>'
                 + '</button>'
@@ -1156,6 +1272,26 @@
                 + '<div class="dl-status hidden text-[10px] sm:text-xs text-purple-400 font-medium px-4 pt-2 text-right"></div>'
                 + '</div>';
         }
+
+        window.openHDModal = function(vUrl, aUrl, quality) {
+            const modal = document.getElementById('hd-modal');
+            const vBtn = document.getElementById('hd-video-btn');
+            const aBtn = document.getElementById('hd-audio-btn');
+            const label = document.getElementById('hd-video-label');
+
+            label.textContent = 'Download Video (' + quality + ')';
+            vBtn.dataset.url = vUrl;
+            aBtn.dataset.url = aUrl;
+
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modal.querySelector('.glass').classList.remove('scale-95');
+        };
+
+        window.closeHDModal = function() {
+            const modal = document.getElementById('hd-modal');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            modal.querySelector('.glass').classList.add('scale-95');
+        };
 
         // ── Main Fetch + Render ──────────────────────────────────────────────
         var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
@@ -1228,16 +1364,30 @@
                         var desc    = (f.ext || 'mp4').toUpperCase() + ' · ' + sizeStr + ' · Optimized';
 
                         var fidParam = f.fid ? '&fid=' + encodeURIComponent(f.fid) : '';
+                        var dlUrl = '/api/download?url=' + encodedUrl + '&type=' + f.height + fidParam;
+
+                        if (f.url) dlUrl = f.url;
+
                         if (typeof f.height === 'number') {
                             if      (f.height >= 2160) { color = 'text-yellow-400'; badge = '4K ULTRA'; }
                             else if (f.height >= 1440) { color = 'text-purple-400'; badge = '2K QUAD'; }
                             else if (f.height >= 1080) { color = 'text-purple-400'; badge = 'FHD 1080';   }
                             else if (f.height >= 720)  { color = 'text-indigo-400'; badge = 'HD 720';    }
-                            html += buildFormatRow(f.height + 'p Premium Video', desc, 'video', color,
-                                '/api/download?url=' + encodedUrl + '&type=' + f.height + fidParam, badge);
+                            
+                            if (f.video_url && f.audio_url) {
+                                // HD / DASH split -> Show one row, opens modal
+                                html += buildFormatRow(f.height + 'p Premium Video', desc, 'video', color, null, badge, { vUrl: f.video_url, aUrl: f.audio_url });
+                            } else {
+                                // Progressive or simple
+                                html += buildFormatRow(f.height + 'p Premium Video', desc, 'video', color, dlUrl, badge);
+                            }
                         } else {
-                            html += buildFormatRow('Original Studio Quality', desc, 'video', 'text-purple-400',
-                                '/api/download?url=' + encodedUrl + '&type=1080' + fidParam, 'SOURCE');
+                            html += buildFormatRow('Original Studio Quality', desc, 'video', 'text-purple-400', dlUrl, 'SOURCE');
+                        }
+
+                        if (data.provider === 'tiktok' && f.url) {
+                             html += buildFormatRow('Proxy Link', 'Use if direct link fails', 'server', 'text-gray-400', 
+                                 '/proxy?url=' + encodeURIComponent(f.url), 'FALLBACK');
                         }
                     });
                 } else {

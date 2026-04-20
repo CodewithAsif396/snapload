@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, RedirectResponse
 import yt_dlp
 import asyncio
 import os
@@ -72,7 +72,9 @@ async def get_info(url: str):
     # Best audio (m4a or any)
     audio_formats = [f for f in formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none']
     best_audio = sorted(audio_formats, key=lambda x: x.get('abr', 0) or 0, reverse=True)
-    audio_size = (best_audio[0].get('filesize') or best_audio[0].get('filesize_approx') or 0) if best_audio else 0
+    best_audio_stream = best_audio[0] if best_audio else None
+    audio_size = (best_audio_stream.get('filesize') or best_audio_stream.get('filesize_approx') or 0) if best_audio_stream else 0
+    audio_url = best_audio_stream.get('url') if best_audio_stream else None
 
     # Build height map — prefer avc/mp4, adaptive streams only
     height_map = {}
@@ -94,12 +96,22 @@ async def get_info(url: str):
     for h in sorted(height_map.keys(), reverse=True):
         f = height_map[h]
         v_size = f.get('filesize') or f.get('filesize_approx') or 0
-        formatted_formats.append({
+        is_progressive = f.get('acodec') != 'none' and f.get('vcodec') != 'none'
+        
+        entry = {
             "height": h,
             "ext": "mp4",
-            "size": (v_size + audio_size) if v_size else None,
-            "fid": f.get("format_id")
-        })
+            "size": (v_size + audio_size) if (v_size and not is_progressive) else (v_size or None),
+            "fid": f.get("format_id"),
+            "progressive": is_progressive
+        }
+        if is_progressive:
+            entry["url"] = f.get("url")
+        else:
+            entry["video_url"] = f.get("url")
+            entry["audio_url"] = audio_url
+            
+        formatted_formats.append(entry)
 
     # Fallback for non-YouTube (Twitter/Instagram — progressive streams)
     if not formatted_formats:
@@ -113,7 +125,9 @@ async def get_info(url: str):
                     "height": h,
                     "ext": f.get('ext', 'mp4'),
                     "size": f.get('filesize') or f.get('filesize_approx') or None,
-                    "fid": f.get("format_id")
+                    "fid": f.get("format_id"),
+                    "progressive": True,
+                    "url": f.get("url")
                 })
 
     return {
@@ -192,23 +206,37 @@ async def download(url: str, height: Optional[str] = None, type: Optional[str] =
         else:
             fmt = 'bestvideo+bestaudio/best'
 
-        # Extract title without a format filter (fast)
-        def get_title():
+        # For optimization, we try to see if it's a progressive stream that can be redirected
+        def get_format_info():
             opts = get_ydl_opts({'skip_download': True, 'format': fmt})
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=False)
-                return (info or {}).get('title', 'video')
+                # If fmt resolved to a single stream, we can redirect
+                requested_formats = info.get('requested_formats')
+                if not requested_formats and info.get('url'):
+                    return info
+                if requested_formats and len(requested_formats) == 1:
+                    return requested_formats[0]
+                return info
 
         try:
-            title = await asyncio.to_thread(get_title)
-        except Exception:
+            f_info = await asyncio.to_thread(get_format_info)
+            title = f_info.get('title') or "video"
+            direct_url = f_info.get('url')
+            
+            # If it's a single direct URL, REDIRECT to save VPS resources
+            if direct_url and "manifest" not in direct_url:
+                print(f"[DOWNLOAD] Redirecting to CDN: {title[:50]}...")
+                return RedirectResponse(url=direct_url)
+        except Exception as e:
+            print(f"[DOWNLOAD INFO ERROR] {e}")
             title = "video"
 
         safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip() or "doomsdaysnap"
-
         media_type = "audio/mpeg" if is_audio else "video/mp4"
         ext = "mp3" if is_audio else "mp4"
 
+        print(f"[DOWNLOAD] Falling back to VPS stream for: {safe_title}")
         return StreamingResponse(
             download_and_stream(url, fmt, safe_title),
             media_type=media_type,

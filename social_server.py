@@ -247,7 +247,7 @@ def social_proxy():
             resp_headers["Content-Range"] = r.headers["Content-Range"]
 
         return Response(
-            r.iter_content(chunk_size=1024 * 64),
+            r.iter_content(chunk_size=1024 * 1024),
             status=r.status_code,
             headers=resp_headers,
         )
