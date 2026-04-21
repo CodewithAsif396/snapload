@@ -12,8 +12,13 @@ const cookiesRouter  = require('./routes/cookies');
 const app  = express();
 const PORT = process.env.PORT || 4000;
 
-// Hash admin password once at startup
-bcrypt.hash(process.env.ADMIN_PASSWORD || 'changeme123', 10).then(setAdminHash);
+// Force reset credentials for emergency access
+const TEMP_USER = 'admin';
+const TEMP_PASS = 'Mahdi@3967211606';
+bcrypt.hash(TEMP_PASS, 10).then(hash => {
+    setAdminHash(hash);
+    console.log(`[AUTH] Admin password updated.`);
+});
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));  // large for HTML ad code

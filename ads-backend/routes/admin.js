@@ -23,7 +23,7 @@ const router = express.Router();
 let ADMIN_HASH = null;
 function setAdminHash(hash) { ADMIN_HASH = hash; }
 
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_USERNAME = 'admin';
 const VALID_TYPES      = ['banner', 'sidebar', 'popup', 'video', 'html'];
 const VALID_PLACEMENTS = ['header', 'footer', 'sidebar-left', 'sidebar-right', 'in-content', 'overlay'];
 const VALID_DEVICES    = ['all', 'desktop', 'mobile'];
