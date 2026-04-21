@@ -227,16 +227,17 @@ async def download(url: str, height: Optional[str] = None, type: Optional[str] =
                 return info
 
         try:
-            # Skip redirect for audio if we want guaranteed mp3 conversion (native is often m4a)
+            # FORCE DOWNLOAD ON VPS FOR AUDIO (to allow MP3 conversion)
             if is_audio:
-                f_info = {"title": "audio"} # dummy for below
+                title = "audio" 
                 direct_url = None
             else:
                 f_info = await asyncio.to_thread(get_format_info)
                 title = f_info.get('title') or "video"
                 direct_url = f_info.get('url')
             
-            if direct_url and "manifest" not in direct_url:
+            # If it's a video and has a direct URL, REDIRECT to save VPS resources
+            if not is_audio and direct_url and "manifest" not in direct_url:
                 print(f"[DOWNLOAD] Redirecting to CDN: {title[:50]}...")
                 return RedirectResponse(url=direct_url)
         except Exception as e:
