@@ -9,6 +9,18 @@ const router = express.Router();
 
 const PROJECT_DIR = path.resolve(__dirname, '../..');
 
+function getPythonCommand() {
+    if (process.platform === 'win32') return 'python';
+    try {
+        const { execSync } = require('child_process');
+        execSync('python3 --version', { stdio: 'ignore' });
+        return 'python3';
+    } catch {
+        return 'python';
+    }
+}
+const PYTHON = getPythonCommand();
+
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
@@ -19,7 +31,7 @@ router.get('/status', requireAuth, (req, res) => {
     try {
         const platform = req.query.platform;
         const result = execSync(
-            `python cookie_manager.py --json`,
+            `${PYTHON} cookie_manager.py --json`,
             { cwd: PROJECT_DIR, timeout: 30000, encoding: 'utf8' }
         );
         const data = JSON.parse(result);
