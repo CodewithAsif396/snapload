@@ -62,24 +62,25 @@ router.post('/upload', requireAuth, upload.single('cookies'), (req, res) => {
 
     fs.writeFileSync(cookiePath, req.file.buffer);
 
-    // Quick validate via python
-    let valid = false;
-    let reason = 'Not checked';
+    // Quick validate via python for all platforms to refresh dashboard
+    let allStatus = {};
     try {
         const result = execSync(
             `${PYTHON} cookie_manager.py --json`,
             { cwd: PROJECT_DIR, timeout: 30000, encoding: 'utf8' }
         );
-        const data = JSON.parse(result);
-        if (data[platform]) {
-            valid = data[platform].valid;
-            reason = data[platform].reason;
-        }
+        allStatus = JSON.parse(result);
     } catch (e) {
-        reason = e.stdout || e.message;
+        console.error('[Cookies] Validation error:', e.message);
     }
 
-    res.json({ success: true, valid, reason, size: req.file.size, platform });
+    res.json({ 
+        success: true, 
+        message: 'Cookies uploaded successfully',
+        platform,
+        status: allStatus[platform] || { valid: false, reason: 'Check failed' },
+        allStatus
+    });
 });
 
 module.exports = router;
