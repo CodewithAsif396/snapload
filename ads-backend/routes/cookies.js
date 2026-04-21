@@ -7,7 +7,10 @@ const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-const PROJECT_DIR = path.resolve(__dirname, '../..');
+// Ensure PROJECT_DIR points to the absolute project root (one level up from ads-backend)
+const PROJECT_DIR = path.resolve(process.cwd(), '..');
+// Fallback if process.cwd is not ads-backend
+const ABS_ROOT = fs.existsSync(path.join(PROJECT_DIR, 'server.js')) ? PROJECT_DIR : path.resolve(__dirname, '../..');
 
 function getPythonCommand() {
     if (process.platform === 'win32') return 'python';
@@ -32,7 +35,7 @@ router.get('/status', requireAuth, (req, res) => {
         const platform = req.query.platform;
         const result = execSync(
             `${PYTHON} cookie_manager.py --json`,
-            { cwd: PROJECT_DIR, timeout: 30000, encoding: 'utf8' }
+            { cwd: ABS_ROOT, timeout: 30000, encoding: 'utf8' }
         );
         const data = JSON.parse(result);
         
@@ -53,7 +56,7 @@ router.post('/upload', requireAuth, upload.single('cookies'), (req, res) => {
     if (req.file.size < 500) return res.status(400).json({ error: 'File too small — not a valid cookies file' });
 
     const filename = `cookies_${platform}.txt`;
-    const cookiePath = path.join(PROJECT_DIR, filename);
+    const cookiePath = path.join(ABS_ROOT, filename);
 
     // Backup old cookies
     if (fs.existsSync(cookiePath)) {
@@ -67,7 +70,7 @@ router.post('/upload', requireAuth, upload.single('cookies'), (req, res) => {
     try {
         const result = execSync(
             `${PYTHON} cookie_manager.py --json`,
-            { cwd: PROJECT_DIR, timeout: 30000, encoding: 'utf8' }
+            { cwd: ABS_ROOT, timeout: 30000, encoding: 'utf8' }
         );
         allStatus = JSON.parse(result);
     } catch (e) {
