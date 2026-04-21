@@ -1242,7 +1242,7 @@
                 : '';
             
             var clickHandler = hdData 
-                ? 'openHDModal(\'' + hdData.vUrl + '\', \'' + hdData.aUrl + '\', \'' + title + '\')'
+                ? 'openHDModal(\'' + hdData.vUrl + '\', \'' + hdData.aUrl + '\', \'' + title + '\', \'' + (window.currentEncodedUrl || '') + '\')'
                 : 'triggerDownload(this, \'' + dlUrl + '\')';
 
             return '<div class="format-row group/item">' +
@@ -1265,14 +1265,21 @@
                 + '</div>';
         }
 
-        window.openHDModal = function(vUrl, aUrl, quality) {
+        window.openHDModal = function(vUrl, aUrl, quality, encodedUrl) {
             const modal = document.getElementById('hd-modal');
             const vBtn = document.getElementById('hd-video-btn');
             const aBtn = document.getElementById('hd-audio-btn');
 
             vBtn.innerHTML = '<i class="fa-solid fa-arrow-down-long"></i> ⬇ Download Video (' + quality + ')';
             vBtn.dataset.url = vUrl;
-            aBtn.dataset.url = aUrl;
+            
+            // Use server's MP3 conversion endpoint for the modal's audio button too
+            if (encodedUrl) {
+                aBtn.innerHTML = '<i class="fa-solid fa-music"></i> ⬇ Download MP3 Audio';
+                aBtn.dataset.url = '/api/download?url=' + encodedUrl + '&type=audio';
+            } else {
+                aBtn.dataset.url = aUrl;
+            }
 
             modal.classList.remove('opacity-0', 'pointer-events-none');
             modal.querySelector('.glass').classList.remove('scale-95');
@@ -1346,6 +1353,7 @@
 
                 var formatsEl  = document.getElementById('res-formats');
                 var encodedUrl = encodeURIComponent(data.originalUrl);
+                window.currentEncodedUrl = encodedUrl;
                 var html       = '';
 
                 if (data.formats && data.formats.length > 0) {
