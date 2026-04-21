@@ -44,9 +44,20 @@ def log(msg):
         f.write(line + "\n")
 
 def get_cookie_path(platform):
-    if platform in PLATFORMS:
-        return os.path.join(PROJECT_DIR, PLATFORMS[platform]["file"])
-    return DEFAULT_COOKIE_FILE
+    filename = PLATFORMS.get(platform, {}).get("file", "cookies.txt")
+    
+    # Check 1: ads-backend/data/ folder (New preferred location)
+    data_path = os.path.join(PROJECT_DIR, "ads-backend", "data", filename)
+    if os.path.exists(data_path) and os.path.getsize(data_path) > 100:
+        return data_path
+        
+    # Check 2: Root folder
+    root_path = os.path.join(PROJECT_DIR, filename)
+    if os.path.exists(root_path) and os.path.getsize(root_path) > 100:
+        return root_path
+        
+    # Default fallback
+    return data_path if platform in PLATFORMS else DEFAULT_COOKIE_FILE
 
 def cookie_age_days(platform) -> float:
     path = get_cookie_path(platform)

@@ -12,11 +12,19 @@ app = FastAPI(title="YouTube Engine V7")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_cookies_file():
-    """Dynamically look for the best cookies file available."""
+    """Dynamically look for the best cookies file available, prioritizing the ads-backend data folder."""
+    # Check 1: ads-backend/data/ folder (New preferred location)
+    data_dir = os.path.join(BASE_DIR, "ads-backend", "data")
+    for name in ["cookies_youtube.txt", "cookies.txt", "youtube_cookies.txt"]:
+        p = os.path.join(data_dir, name)
+        if os.path.exists(p) and os.path.getsize(p) > 100:
+            return p
+            
+    # Check 2: Root folder fallback
     for name in ["cookies_youtube.txt", "cookies (1).txt", "cookies.txt"]:
-        path = os.path.join(BASE_DIR, name)
-        if os.path.exists(path) and os.path.getsize(path) > 100:
-            return path
+        p = os.path.join(BASE_DIR, name)
+        if os.path.exists(p) and os.path.getsize(p) > 100:
+            return p
     return None
 
 def get_ydl_opts(extra=None):

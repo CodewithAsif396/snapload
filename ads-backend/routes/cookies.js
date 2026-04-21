@@ -7,10 +7,12 @@ const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Always calculate root relative to this file's location
-// __dirname is root/ads-backend/routes
-const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
-const ABS_ROOT = PROJECT_ROOT;
+// Store cookies in the ads-backend/data folder which is definitely writable
+const ABS_ROOT = path.resolve(__dirname, '..', 'data');
+if (!fs.existsSync(ABS_ROOT)) fs.mkdirSync(ABS_ROOT, { recursive: true });
+
+// Also need the main root for cookie_manager.py execution
+const MAIN_ROOT = path.resolve(__dirname, '..', '..');
 
 function getPythonCommand() {
     if (process.platform === 'win32') return 'python';
@@ -35,7 +37,7 @@ router.get('/status', requireAuth, (req, res) => {
         const platform = req.query.platform;
         const result = execSync(
             `${PYTHON} cookie_manager.py --json`,
-            { cwd: ABS_ROOT, timeout: 30000, encoding: 'utf8' }
+            { cwd: MAIN_ROOT, timeout: 30000, encoding: 'utf8' }
         );
         const data = JSON.parse(result);
         
@@ -70,7 +72,7 @@ router.post('/upload', requireAuth, upload.single('cookies'), (req, res) => {
     try {
         const result = execSync(
             `${PYTHON} cookie_manager.py --json`,
-            { cwd: ABS_ROOT, timeout: 30000, encoding: 'utf8' }
+            { cwd: MAIN_ROOT, timeout: 30000, encoding: 'utf8' }
         );
         allStatus = JSON.parse(result);
     } catch (e) {

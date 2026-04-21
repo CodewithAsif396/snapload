@@ -40,11 +40,17 @@ def fetch_facebook(url):
         # Base directory of the project
         BASE = os.path.dirname(os.path.abspath(__file__))
         
-        # Determine which cookie file to use
-        # Prefers cookies_facebook.txt (new system), fallbacks to cookies.txt (legacy)
-        cookie_file = os.path.join(BASE, 'cookies_facebook.txt')
-        if not os.path.exists(cookie_file):
-            cookie_file = os.path.join(BASE, 'cookies.txt')
+        # Priority 1: Check ads-backend/data/ folder
+        cookie_file = os.path.join(BASE, 'ads-backend', 'data', 'cookies_facebook.txt')
+        if not (os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 100):
+            # Priority 2: Check root folder
+            cookie_file = os.path.join(BASE, 'cookies_facebook.txt')
+            if not (os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 100):
+                # Fallback: legacy cookies.txt
+                cookie_file = os.path.join(BASE, 'cookies.txt')
+        
+        if not (os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 100):
+            cookie_file = None
         
         # Command to get metadata in JSON format
         cmd = [
