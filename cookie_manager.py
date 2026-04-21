@@ -13,22 +13,22 @@ LOG_FILE = os.path.join(PROJECT_DIR, "maintenance.log")
 PLATFORMS = {
     "facebook": {
         "file": "cookies_facebook.txt",
-        "test_url": "https://www.facebook.com/watch/?v=10158496791596729", # FB public video
+        "test_url": "https://www.facebook.com/facebook/videos/10153231379941729/", # Official FB video
         "max_age_days": 15
     },
     "youtube": {
         "file": "cookies_youtube.txt",
-        "test_url": "https://www.youtube.com/watch?v=BaW_jenozKc",
+        "test_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw", # Me at the zoo (Very stable)
         "max_age_days": 10
     },
     "instagram": {
         "file": "cookies_instagram.txt",
-        "test_url": "https://www.instagram.com/reels/C53XpW2S9W_/",
+        "test_url": "https://www.instagram.com/p/C3m8h-Xv7mY/", # Public post
         "max_age_days": 7
     },
     "tiktok": {
         "file": "cookies_tiktok.txt",
-        "test_url": "https://www.tiktok.com/@khaby.lame/video/7356230412351234306",
+        "test_url": "https://www.tiktok.com/@tiktok/video/7106594312290110766", # Official TikTok
         "max_age_days": 7
     }
 }
