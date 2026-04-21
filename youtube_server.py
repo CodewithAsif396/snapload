@@ -13,7 +13,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_cookies_file():
     """Dynamically look for the best cookies file available."""
-    for name in ["cookies (1).txt", "cookies.txt"]:
+    for name in ["cookies_youtube.txt", "cookies (1).txt", "cookies.txt"]:
         path = os.path.join(BASE_DIR, name)
         if os.path.exists(path) and os.path.getsize(path) > 100:
             return path
