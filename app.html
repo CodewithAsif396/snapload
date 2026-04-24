@@ -126,7 +126,7 @@
             50% { transform: scale(1.1); opacity: 1; }
         }
         .loader-bar {
-            width: 200px; h-1.5 bg-white/5 rounded-full mt-8 overflow-hidden relative;
+            width: 200px; height: 6px; background: rgba(255,255,255,0.05); border-radius: 9999px; margin-top: 2rem; overflow: hidden; position: relative;
         }
         .loader-progress {
             position: absolute; top: 0; left: 0; height: 100%;
@@ -1390,8 +1390,15 @@
                 if (data.formats && data.formats.length > 0) {
                     data.formats.forEach(function (f) {
                         var color = 'text-blue-400', badge = '';
-                        var sizeStr = f.size ? (f.size / (1024 * 1024)).toFixed(1) + ' MB' : 'HD Ready';
-                        var desc    = (f.ext || 'mp4').toUpperCase() + ' · ' + sizeStr;
+                        var desc    = (f.ext || 'mp4').toUpperCase();
+
+                        // ── Direct URL (Facebook / TikTok) — open in new tab, zero server load ──
+                        if (f.directUrl) {
+                            var escapedDirect = f.directUrl.replace(/'/g, "\\'");
+                            var directBadge = data.provider === 'facebook' ? 'HD' : 'NO WATERMARK';
+                            html += buildFormatRow(f.label || 'HD Video', (f.ext || 'mp4').toUpperCase(), 'video', 'text-blue-400', escapedDirect, directBadge, null, true);
+                            return;
+                        }
 
                         // ── All other platforms ──────────────────────────────────────────
                         var fidParam = f.fid ? '&fid=' + encodeURIComponent(f.fid) : '';

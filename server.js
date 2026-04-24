@@ -1838,46 +1838,7 @@ app.post('/api/info', rateLimit, async (req, res) => {
         console.log(`[INFO] ${provider.constructor.name} → ${safeUrl}`);
         const info = await provider.getInfo(safeUrl);
 
-        // TikTok: call tikwm to get DIRECT CDN URLs so browser downloads without backend proxying
-        if (isTikTok) {
-            const tikwmData = await new Promise((resolve) => {
-                const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(safeUrl)}&hd=1`;
-                https.get(apiUrl, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.tikwm.com/' } }, (r) => {
-                    let d = ''; r.on('data', c => d += c);
-                    r.on('end', () => { try { const j = JSON.parse(d); resolve(j?.code === 0 ? j.data : null); } catch { resolve(null); } });
-                }).on('error', () => resolve(null));
-                setTimeout(() => resolve(null), 8000);
-            });
-
-            if (tikwmData) {
-                const fmts = [];
-                if (tikwmData.hdplay) fmts.push({
-                    label: 'Original HD (No Watermark)',
-                    ext: 'mp4',
-                    height: tikwmData.height || 1080,
-                    size: tikwmData.hd_size || null,
-                    directUrl: tikwmData.hdplay,   // browser opens this directly
-                });
-                if (tikwmData.play) fmts.push({
-                    label: 'Standard Quality',
-                    ext: 'mp4',
-                    height: Math.round((tikwmData.height || 1080) * 0.75),
-                    size: tikwmData.size || null,
-                    directUrl: tikwmData.play,
-                });
-                if (tikwmData.music) {
-                    info.audioFormats = [{
-                        label: 'Audio MP3',
-                        ext: 'mp3',
-                        directUrl: tikwmData.music,
-                    }];
-                }
-                info.formats = fmts.length ? fmts : [{ label: 'Original Quality', ext: 'mp4', height: 'original', size: null }];
-            } else {
-                info.formats = [{ label: 'Original Quality', ext: 'mp4', height: 'original', size: null }];
-            }
-            info.audioFormats = info.audioFormats || [];
-        }
+        info.audioFormats = info.audioFormats || [];
 
         // Fetch file sizes in parallel for all formats using the new getFileSize method
         if (info.formats && info.formats.length > 0) {
@@ -2099,12 +2060,8 @@ app.get('/api/download', rateLimit, async (req, res) => {
             })();
 
             if (tikwmOriginal) {
-                console.log('[DOWNLOAD] tikwm original URL:', tikwmOriginal.slice(0, 100));
-                const ok = await pipeCdnUrl(tikwmOriginal, res, req, {
-                    'Referer': 'https://www.tiktok.com/',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                });
-                if (ok) return;
+                console.log('[DOWNLOAD] tikwm original URL — redirecting browser:', tikwmOriginal.slice(0, 100));
+                if (!res.headersSent) return res.redirect(302, tikwmOriginal);
             }
 
             if (!res.headersSent) res.status(500).send('TikTok video download failed. Try again.');
