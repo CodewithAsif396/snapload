@@ -220,20 +220,25 @@ class TikTokProvider extends BaseProvider {
                         ext:    'mp4',
                         size:   best.PlayAddr?.DataSize || null,
                         label:  `${best.GearName} · ${res}`,
+                        directUrl: best.PlayAddr?.UrlList?.[0]
                     });
                 } else if (video.downloadAddr || video.playAddr) {
-                    formats.push({ height: h, ext: 'mp4', size: null, label: `HD · ${res}` });
+                    formats.push({ height: h, ext: 'mp4', size: null, label: `HD · ${res}`, directUrl: video.downloadAddr || video.playAddr });
                 }
 
                 if (formats.length > 0) {
                     const dur = video.duration || 0; // seconds in web API
                     const mm  = String(Math.floor(dur / 60));
                     const ss  = String(dur % 60).padStart(2, '0');
+                    const audioFormats = [];
+                    if (item?.music?.playUrl) audioFormats.push({ directUrl: item.music.playUrl.urlList?.[0] || item.music.playUrl });
+
                     return {
                         title:     item.desc  || 'TikTok Video',
                         thumbnail: video.cover || '',
                         duration:  `${mm}:${ss}`,
                         formats,
+                        audioFormats,
                         provider:  'tiktok',
                     };
                 }
@@ -257,20 +262,25 @@ class TikTokProvider extends BaseProvider {
                         ext:    'mp4',
                         size:   best.play_addr?.data_size || null,
                         label:  `${best.gear_name} · ${w}×${h}`,
+                        directUrl: best.play_addr?.url_list?.[0]
                     });
                 } else if (video.download_addr || video.play_addr) {
-                    formats.push({ height: h, ext: 'mp4', size: null, label: `HD · ${w}×${h}` });
+                    formats.push({ height: h, ext: 'mp4', size: null, label: `HD · ${w}×${h}`, directUrl: video.download_addr?.url_list?.[0] || video.play_addr?.url_list?.[0] });
                 }
 
                 if (formats.length > 0) {
                     const durSec = Math.round((video.duration || 0) / 1000);
                     const mm = String(Math.floor(durSec / 60));
                     const ss = String(durSec % 60).padStart(2, '0');
+                    const audioFormats = [];
+                    if (aweme?.music?.play_url?.url_list?.[0]) audioFormats.push({ directUrl: aweme.music.play_url.url_list[0] });
+
                     return {
                         title:     aweme.desc                 || 'TikTok Video',
                         thumbnail: video.cover?.url_list?.[0] || '',
                         duration:  `${mm}:${ss}`,
                         formats,
+                        audioFormats,
                         provider:  'tiktok',
                     };
                 }
@@ -292,18 +302,22 @@ class TikTokProvider extends BaseProvider {
                 const best = pickBestBitrateInfo(video.bitrateInfo);
                 if (best) {
                     const bh = parseInt(best.GearName?.match(/(\d{3,4})/)?.[1]) || h;
-                    formats.push({ height: bh, ext: 'mp4', size: best.PlayAddr?.DataSize || null, label: `${best.GearName} · ${res}` });
+                    formats.push({ height: bh, ext: 'mp4', size: best.PlayAddr?.DataSize || null, label: `${best.GearName} · ${res}`, directUrl: best.PlayAddr?.UrlList?.[0] });
                 } else if (video.downloadAddr || video.playAddr) {
-                    formats.push({ height: h, ext: 'mp4', size: null, label: `Original · ${res}` });
+                    formats.push({ height: h, ext: 'mp4', size: null, label: `Original · ${res}`, directUrl: video.downloadAddr || video.playAddr });
                 }
 
                 if (formats.length > 0) {
                     const dur = video.duration || 0;
+                    const audioFormats = [];
+                    if (item?.music?.playUrl) audioFormats.push({ directUrl: item.music.playUrl });
+
                     return {
                         title:     item.desc  || 'TikTok Video',
                         thumbnail: video.cover || '',
                         duration:  `${String(Math.floor(dur / 60))}:${String(dur % 60).padStart(2, '0')}`,
                         formats,
+                        audioFormats,
                         provider:  'tiktok',
                     };
                 }
@@ -316,9 +330,12 @@ class TikTokProvider extends BaseProvider {
             const w = data.width  || 1080;
             const h = data.height || 1920;
             const formats = [];
-            if (data.hdplay) formats.push({ height: h, ext: 'mp4', size: data.hd_size || null, label: `Original HD · ${w}×${h}` });
-            if (data.play)   formats.push({ height: Math.round(h * 0.75), ext: 'mp4', size: data.size || null, label: `Standard · ${w}×${h}` });
+            if (data.hdplay) formats.push({ height: h, ext: 'mp4', size: data.hd_size || null, label: `Original HD · ${w}×${h}`, directUrl: data.hdplay });
+            if (data.play)   formats.push({ height: Math.round(h * 0.75), ext: 'mp4', size: data.size || null, label: `Standard · ${w}×${h}`, directUrl: data.play });
             if (!formats.length) formats.push({ height: 'HD', ext: 'mp4', size: null });
+
+            const audioFormats = [];
+            if (data.music) audioFormats.push({ directUrl: data.music });
 
             const dur = data.duration || 0;
             return {
@@ -326,6 +343,7 @@ class TikTokProvider extends BaseProvider {
                 thumbnail: data.cover || '',
                 duration:  `${String(Math.floor(dur / 60))}:${String(dur % 60).padStart(2, '0')}`,
                 formats,
+                audioFormats,
                 provider:  'tiktok',
             };
         }
