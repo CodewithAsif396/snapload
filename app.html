@@ -289,7 +289,7 @@
 </head>
 <body class="antialiased relative min-h-screen flex flex-col font-sans">
     <!-- Cloudflare-style Security Challenge -->
-    <div id="security-overlay" style="display: none !important;">
+    <div id="security-overlay">
         <div class="security-shield">
             <i class="fa-solid fa-shield-halved"></i>
         </div>
@@ -303,9 +303,18 @@
     </div>
 
     <script>
-        // Force hide Cloudflare Turnstile immediately
-        document.getElementById('security-overlay').style.display = 'none';
-        window.onChallengeSuccess = function() {}; 
+        // Bypass Cloudflare Turnstile only on localhost
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            document.getElementById('security-overlay').style.display = 'none';
+            window.onChallengeSuccess = function() {}; 
+        } else {
+            window.onChallengeSuccess = function(token) {
+                document.getElementById('security-overlay').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('security-overlay').style.display = 'none';
+                }, 800);
+            };
+        }
     </script>
 
     <!-- HD Download Modal -->
