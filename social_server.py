@@ -40,17 +40,27 @@ def fetch_facebook(url):
         # Base directory of the project
         BASE = os.path.dirname(os.path.abspath(__file__))
         
-        # Priority 1: Check ads-backend/data/ folder
-        cookie_file = os.path.join(BASE, 'ads-backend', 'data', 'cookies_facebook.txt')
-        if not (os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 100):
-            # Priority 2: Check root folder
-            cookie_file = os.path.join(BASE, 'cookies_facebook.txt')
-            if not (os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 100):
-                # Fallback: legacy cookies.txt
-                cookie_file = os.path.join(BASE, 'cookies.txt')
+        # ── Cookie Detection ──
+        search_dirs = [os.path.join(BASE, 'ads-backend', 'data'), BASE]
+        potential_files = []
+        for d in search_dirs:
+            if not os.path.exists(d): continue
+            for name in os.listdir(d):
+                if name.endswith(".txt") and "cookie" in name.lower():
+                    p = os.path.join(d, name)
+                    if os.path.isfile(p) and os.path.getsize(p) > 100:
+                        potential_files.append(p)
         
-        if not (os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 100):
-            cookie_file = None
+        # Priority: cookies_facebook.txt first, then largest
+        cookie_file = None
+        if potential_files:
+            fb_specific = [f for f in potential_files if "facebook" in os.path.basename(f).lower()]
+            if fb_specific:
+                fb_specific.sort(key=os.path.getsize, reverse=True)
+                cookie_file = fb_specific[0]
+            else:
+                potential_files.sort(key=os.path.getsize, reverse=True)
+                cookie_file = potential_files[0]
         
         # Command to get metadata in JSON format
         cmd = [

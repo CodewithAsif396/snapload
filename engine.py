@@ -15,11 +15,33 @@ PLAYER_CLIENTS = [
 
 
 def find_cookie_file():
-    for name in ["cookies.txt", "cookies (1).txt"]:
-        path = os.path.join(PROJECT_DIR, name)
-        if os.path.exists(path) and os.path.getsize(path) > 500:
-            return path
-    return None
+    """Dynamically find the best cookie file, picking the largest available one."""
+    search_dirs = [
+        os.path.join(PROJECT_DIR, "ads-backend", "data"),
+        PROJECT_DIR
+    ]
+    
+    potential_files = []
+    for directory in search_dirs:
+        if not os.path.exists(directory):
+            continue
+        try:
+            for name in os.listdir(directory):
+                if name.endswith(".txt") and "cookie" in name.lower():
+                    path = os.path.join(directory, name)
+                    if os.path.isfile(path):
+                        potential_files.append(path)
+        except:
+            continue
+
+    # Filter by minimum size (ensure it's not empty)
+    valid_files = [f for f in potential_files if os.path.getsize(f) > 500]
+    if not valid_files:
+        return None
+        
+    # Pick the largest file - usually the most complete one
+    valid_files.sort(key=lambda x: os.path.getsize(x), reverse=True)
+    return valid_files[0]
 
 
 class ExplodeEngine:

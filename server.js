@@ -1838,11 +1838,44 @@ app.post('/api/info', rateLimit, async (req, res) => {
         console.log(`[INFO] ${provider.constructor.name} → ${safeUrl}`);
         const info = await provider.getInfo(safeUrl);
 
-        // TikTok: replace compressed bitrateInfo formats with single Original Quality option
+        // TikTok: call tikwm to get DIRECT CDN URLs so browser downloads without backend proxying
         if (isTikTok) {
-            info.formats = [
-                { label: 'Original Quality', ext: 'mp4', height: 'original', size: null },
-            ];
+            const tikwmData = await new Promise((resolve) => {
+                const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(safeUrl)}&hd=1`;
+                https.get(apiUrl, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.tikwm.com/' } }, (r) => {
+                    let d = ''; r.on('data', c => d += c);
+                    r.on('end', () => { try { const j = JSON.parse(d); resolve(j?.code === 0 ? j.data : null); } catch { resolve(null); } });
+                }).on('error', () => resolve(null));
+                setTimeout(() => resolve(null), 8000);
+            });
+
+            if (tikwmData) {
+                const fmts = [];
+                if (tikwmData.hdplay) fmts.push({
+                    label: 'Original HD (No Watermark)',
+                    ext: 'mp4',
+                    height: tikwmData.height || 1080,
+                    size: tikwmData.hd_size || null,
+                    directUrl: tikwmData.hdplay,   // browser opens this directly
+                });
+                if (tikwmData.play) fmts.push({
+                    label: 'Standard Quality',
+                    ext: 'mp4',
+                    height: Math.round((tikwmData.height || 1080) * 0.75),
+                    size: tikwmData.size || null,
+                    directUrl: tikwmData.play,
+                });
+                if (tikwmData.music) {
+                    info.audioFormats = [{
+                        label: 'Audio MP3',
+                        ext: 'mp3',
+                        directUrl: tikwmData.music,
+                    }];
+                }
+                info.formats = fmts.length ? fmts : [{ label: 'Original Quality', ext: 'mp4', height: 'original', size: null }];
+            } else {
+                info.formats = [{ label: 'Original Quality', ext: 'mp4', height: 'original', size: null }];
+            }
             info.audioFormats = info.audioFormats || [];
         }
 
@@ -1940,7 +1973,7 @@ app.get('/api/download', rateLimit, async (req, res) => {
     // ── YouTube Hybrid Pro Download ──
     if (isYouTube) {
         console.log(`[DOWNLOAD] YouTube Hybrid Pro Pipe → ${safeUrl.slice(0, 60)}`);
-        const pyUrl = `http://127.0.0.1:5002/download?url=${encodeURIComponent(safeUrl)}${type ? `&height=${type}` : ''}`;
+        const pyUrl = `http://127.0.0.1:5002/download?url=${encodeURIComponent(safeUrl)}${type ? `&height=${type}` : ''}${fid ? `&fid=${encodeURIComponent(fid)}` : ''}`;
         
         const pyReq = http.get(pyUrl, (pyRes) => {
             if (pyRes.statusCode !== 200) {
@@ -1985,24 +2018,7 @@ app.get('/api/download', rateLimit, async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
 
     try {
-        if (isYouTube) {
-            // YouTube CDN URLs work without cookies → try direct pipe first
-            const urls = await getDirectUrls(safeUrl, format);
-
-            if (urls.length === 0) {
-                return res.status(500).send('Could not resolve download URL.');
-            }
-
-            if (urls.length === 1) {
-                // Progressive format (≤480p usually) — direct CDN, full speed
-                console.log(`[DOWNLOAD] YT single-stream → CDN direct`);
-                pipeCdnUrl(urls[0], res, req);
-            } else {
-                // Separate video+audio (720p+) — merge via ffmpeg
-                console.log(`[DOWNLOAD] YT multi-stream → ffmpeg merge`);
-                spawnMergeStream(safeUrl, format, res, req, YT_ARGS);
-            }
-        } else if (isTikTok) {
+        if (isTikTok) {
             const isAudio = type === 'audio';
 
             if (isAudio) {

@@ -67,7 +67,12 @@
       "Bash(node --check d:/doomsdaysnap/server.js)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(sed -n '577,581p' \"e:/test doomsdaysnap/server.js\")",
+      "Bash(sed -n '2226,2230p' \"e:/test doomsdaysnap/server.js\")",
+      "Bash(sed -n '2436,2440p' \"e:/test doomsdaysnap/server.js\")",
+      "Bash(node -e ' *)",
+      "Bash(node --check \"e:/test doomsdaysnap/server.js\")"
     ]
   }
 }
