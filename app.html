@@ -1392,36 +1392,7 @@
                         var color = 'text-blue-400', badge = '';
                         var desc    = (f.ext || 'mp4').toUpperCase();
 
-                        // ── TikTok: directUrl provided — open in new tab, zero backend load ──
-                        if (data.provider === 'tiktok' && f.directUrl) {
-                            var sizeStr = f.size ? (f.size / (1024 * 1024)).toFixed(1) + ' MB' : 'HD Ready';
-                            badge = f.label && f.label.includes('HD') ? 'NO WATERMARK' : 'DIRECT';
-                            color = 'text-[#25F4EE]';
-                            desc  = 'MP4 · ' + sizeStr + ' · Opens in new tab';
-                            var label = f.label || (typeof f.height === 'number' ? f.height + 'p Video' : 'Original Video');
-                            var escapedUrl = f.directUrl.replace(/'/g, "\\'");
-                            html += '<div class="format-row group/item">' +
-                                '<div class="flex items-center justify-between glass-card p-2.5 sm:p-4 rounded-xl sm:rounded-2xl hover:bg-white/5 transition-all border border-[#25F4EE]/10">' +
-                                '<div class="flex items-center gap-3 sm:gap-4">' +
-                                '<div class="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-[#25F4EE]/10 flex items-center justify-center ' + color + ' flex-shrink-0">' +
-                                '<i class="fa-brands fa-tiktok text-sm sm:text-base"></i>' +
-                                '</div>' +
-                                '<div>' +
-                                '<p class="font-semibold text-white text-xs sm:text-base flex items-center flex-wrap gap-1">' + label +
-                                '<span class="ml-1 text-[9px] sm:text-[10px] py-0.5 px-2 bg-[#25F4EE]/20 text-[#25F4EE] rounded-full font-bold">' + badge + '</span>' +
-                                '</p>' +
-                                '<p class="text-[10px] sm:text-[11px] text-gray-400 uppercase tracking-wider mt-0.5">' + desc + '</p>' +
-                                '</div>' +
-                                '</div>' +
-                                '<button onclick="triggerDirectOpen(this, \'' + escapedUrl + '\')" ' +
-                                'class="bg-[#25F4EE]/20 hover:bg-[#25F4EE]/30 text-[#25F4EE] border border-[#25F4EE]/30 px-2.5 py-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-sm flex items-center gap-1.5 active:scale-95 transition-all flex-shrink-0">' +
-                                '<i class="fa-solid fa-arrow-up-right-from-square text-xs"></i><span class="hidden sm:inline">Open & Save</span>' +
-                                '</button>' +
-                                '</div>' +
-                                '<div class="dl-status hidden text-[10px] sm:text-xs text-[#25F4EE] font-medium px-4 pt-2 text-right"></div>' +
-                                '</div>';
-                            return;
-                        }
+
 
                         // ── Direct URL (Facebook / Snapchat) — open in new tab, zero server load ──
                         if (f.directUrl) {
@@ -1452,43 +1423,20 @@
                             if (f.video_url && f.audio_url) {
                                 html += buildFormatRow(f.height + 'p Premium Video', desc, 'video', color, null, badge, { vUrl: f.video_url, aUrl: f.audio_url });
                             } else {
-                                html += buildFormatRow(f.height + 'p Premium Video', desc, 'video', color, dlUrl, badge);
+                                html += buildFormatRow(f.height + 'p Premium Video', desc, 'video', color, dlUrl, badge, null, data.provider === 'tiktok');
                             }
                         } else {
-                            html += buildFormatRow('Original Studio Quality', desc, 'video', 'text-purple-400', dlUrl, 'SOURCE');
+                            html += buildFormatRow('Original Studio Quality', desc, 'video', 'text-purple-400', dlUrl, 'SOURCE', null, data.provider === 'tiktok');
                         }
                     });
                 } else {
                     html += buildFormatRow('Best HD Available', 'Source direct extraction', 'video', 'text-purple-400',
-                        '/api/download?url=' + encodedUrl + '&type=1080', 'HD');
+                        '/api/download?url=' + encodedUrl + '&type=1080', 'HD', null, data.provider === 'tiktok');
                 }
 
-                // Audio row — for TikTok check audioFormats directUrl first
-                var tiktokAudioDirect = data.provider === 'tiktok' && data.audioFormats && data.audioFormats[0] && data.audioFormats[0].directUrl;
-                if (tiktokAudioDirect) {
-                    var audioUrl = data.audioFormats[0].directUrl.replace(/'/g, "\\'");
-                    html += '<div class="format-row group/item">' +
-                        '<div class="flex items-center justify-between glass-card p-2.5 sm:p-4 rounded-xl sm:rounded-2xl hover:bg-white/5 transition-all border border-pink-500/10">' +
-                        '<div class="flex items-center gap-3 sm:gap-4">' +
-                        '<div class="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-pink-500/10 flex items-center justify-center text-pink-400 flex-shrink-0">' +
-                        '<i class="fa-solid fa-music text-sm sm:text-base"></i>' +
-                        '</div>' +
-                        '<div>' +
-                        '<p class="font-semibold text-white text-xs sm:text-base">Original Audio (MP3)</p>' +
-                        '<p class="text-[10px] sm:text-[11px] text-gray-400 uppercase tracking-wider mt-0.5">MP3 · High Bitrate · New Tab</p>' +
-                        '</div>' +
-                        '</div>' +
-                        '<button onclick="triggerDirectOpen(this, \'' + audioUrl + '\')" ' +
-                        'class="bg-pink-500/10 hover:bg-pink-500/20 text-pink-400 border border-pink-500/20 px-2.5 py-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-sm flex items-center gap-1.5 active:scale-95 transition-all flex-shrink-0">' +
-                        '<i class="fa-solid fa-arrow-up-right-from-square text-xs"></i><span class="hidden sm:inline">Open & Save</span>' +
-                        '</button>' +
-                        '</div>' +
-                        '<div class="dl-status hidden text-[10px] sm:text-xs text-pink-400 font-medium px-4 pt-2 text-right"></div>' +
-                        '</div>';
-                } else {
-                    html += buildFormatRow('Audio Only (MP3)', 'High-bitrate audio extraction', 'music', 'text-pink-400',
-                        '/api/download?url=' + encodedUrl + '&type=audio', '');
-                }
+                // Audio row
+                html += buildFormatRow('Audio Only (MP3)', 'High-bitrate audio extraction', 'music', 'text-pink-400',
+                    '/api/download?url=' + encodedUrl + '&type=audio', '', null, data.provider === 'tiktok');
 
                 formatsEl.innerHTML = html;
 
