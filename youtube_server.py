@@ -1,5 +1,5 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+﻿from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse, RedirectResponse
 import yt_dlp
 import asyncio
 import os
@@ -12,33 +12,12 @@ app = FastAPI(title="YouTube Engine V7")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_cookies_file():
-    """Dynamically look for the best cookies file available, prioritizing larger files."""
-    search_dirs = [
-        os.path.join(BASE_DIR, "ads-backend", "data"),
-        BASE_DIR
-    ]
-    
-    potential_files = []
-    for directory in search_dirs:
-        if not os.path.exists(directory):
-            continue
-        for name in os.listdir(directory):
-            if name.endswith(".txt") and "cookie" in name.lower():
-                path = os.path.join(directory, name)
-                if os.path.isfile(path):
-                    potential_files.append(path)
-
-    # Filter by minimum size and existence
-    valid_files = [f for f in potential_files if os.path.getsize(f) > 100]
-    if not valid_files:
-        return None
-        
-    # Sort by size descending - larger files usually contain more relevant cookies
-    valid_files.sort(key=lambda x: os.path.getsize(x), reverse=True)
-    
-    # Debug print
-    print(f"[COOKIES] Using: {os.path.basename(valid_files[0])} ({os.path.getsize(valid_files[0])} bytes)")
-    return valid_files[0]
+    """Dynamically look for the best cookies file available."""
+    for name in ["cookies_youtube.txt", "cookies (1).txt", "cookies.txt"]:
+        path = os.path.join(BASE_DIR, name)
+        if os.path.exists(path) and os.path.getsize(path) > 100:
+            return path
+    return None
 
 def get_ydl_opts(extra=None):
     """Generate yt-dlp options with the latest cookie path."""
@@ -69,7 +48,7 @@ async def health():
 @app.get("/info")
 async def get_info(url: str):
     def extract():
-        # No format filter — get ALL formats for listing
+        # No format filter ÔÇö get ALL formats for listing
         opts = get_ydl_opts()
         with yt_dlp.YoutubeDL(opts) as ydl:
             return ydl.extract_info(url, download=False)
@@ -97,7 +76,7 @@ async def get_info(url: str):
     audio_size = (best_audio_stream.get('filesize') or best_audio_stream.get('filesize_approx') or 0) if best_audio_stream else 0
     audio_url = best_audio_stream.get('url') if best_audio_stream else None
 
-    # Build height map — prefer avc/mp4, adaptive streams only
+    # Build height map ÔÇö prefer avc/mp4, adaptive streams only
     height_map = {}
     for f in formats:
         h = f.get("height")
@@ -126,13 +105,15 @@ async def get_info(url: str):
             "fid": f.get("format_id"),
             "progressive": is_progressive
         }
-        # We NO LONGER provide direct URLs here because YouTube CDN URLs are IP-locked.
-        # Removing 'url', 'video_url', and 'audio_url' forces the frontend to use /api/download,
-        # which proxies the stream through our VPS and avoids the 403 Forbidden error.
+        if is_progressive:
+            entry["url"] = f.get("url")
+        else:
+            entry["video_url"] = f.get("url")
+            entry["audio_url"] = audio_url
             
         formatted_formats.append(entry)
 
-    # Fallback for non-YouTube (Twitter/Instagram — progressive streams)
+    # Fallback for non-YouTube (Twitter/Instagram ÔÇö progressive streams)
     if not formatted_formats:
         prog = [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none' and f.get('height')]
         seen = set()
@@ -140,18 +121,14 @@ async def get_info(url: str):
             h = f.get('height')
             if h and h not in seen:
                 seen.add(h)
-                entry = {
+                formatted_formats.append({
                     "height": h,
                     "ext": f.get('ext', 'mp4'),
                     "size": f.get('filesize') or f.get('filesize_approx') or None,
                     "fid": f.get("format_id"),
-                    "progressive": True
-                }
-                # Only provide direct URL for non-YouTube platforms (Twitter/Instagram)
-                if info.get("extractor_key", "").lower() != "youtube":
-                    entry["url"] = f.get("url")
-                    
-                formatted_formats.append(entry)
+                    "progressive": True,
+                    "url": f.get("url")
+                })
 
     return {
         "title": info.get("title", ""),
@@ -224,31 +201,45 @@ async def download_and_stream(url: str, fmt: str, safe_title: str, is_audio: boo
 
 
 @app.get("/download")
-async def download(url: str, height: Optional[str] = None, type: Optional[str] = None, fid: Optional[str] = None):
+async def download(url: str, height: Optional[str] = None, type: Optional[str] = None):
     try:
         raw = height or type
         is_audio = raw == 'audio'
         h = None if (not raw or is_audio) else int(raw)
 
-        if fid:
-            # Use specific format if requested
-            fmt = f"{fid}+bestaudio/best" if not is_audio else fid
-        elif is_audio:
+        if is_audio:
             fmt = 'bestaudio/best'
         elif h:
             fmt = f'bestvideo[height<={h}]+bestaudio/best'
         else:
             fmt = 'bestvideo+bestaudio/best'
 
-        # We always stream through VPS now to avoid 403 Forbidden (IP-locking) from YouTube CDN
+        # For optimization, we try to see if it's a progressive stream that can be redirected
         def get_format_info():
             opts = get_ydl_opts({'skip_download': True, 'format': fmt})
             with yt_dlp.YoutubeDL(opts) as ydl:
-                return ydl.extract_info(url, download=False)
+                info = ydl.extract_info(url, download=False)
+                requested_formats = info.get('requested_formats')
+                if not requested_formats and info.get('url'):
+                    return info
+                if requested_formats and len(requested_formats) == 1:
+                    return requested_formats[0]
+                return info
 
         try:
-            f_info = await asyncio.to_thread(get_format_info)
-            title = f_info.get('title') or "video"
+            # FORCE DOWNLOAD ON VPS FOR AUDIO (to allow MP3 conversion)
+            if is_audio:
+                title = "audio" 
+                direct_url = None
+            else:
+                f_info = await asyncio.to_thread(get_format_info)
+                title = f_info.get('title') or "video"
+                direct_url = f_info.get('url')
+            
+            # If it's a video and has a direct URL, REDIRECT to save VPS resources
+            if not is_audio and direct_url and "manifest" not in direct_url:
+                print(f"[DOWNLOAD] Redirecting to CDN: {title[:50]}...")
+                return RedirectResponse(url=direct_url)
         except Exception as e:
             print(f"[DOWNLOAD INFO ERROR] {e}")
             title = "video"
@@ -261,9 +252,7 @@ async def download(url: str, height: Optional[str] = None, type: Optional[str] =
         return StreamingResponse(
             download_and_stream(url, fmt, safe_title, is_audio),
             media_type=media_type,
-            headers={
-                "Content-Disposition": f'attachment; filename="{safe_title}.{ext}"'
-            }
+            headers={"Content-Disposition": f'attachment; filename="{safe_title}.{ext}"'}
         )
     except HTTPException:
         raise
