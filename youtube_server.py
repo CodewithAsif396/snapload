@@ -4,9 +4,10 @@ import yt_dlp
 import asyncio
 import os
 import tempfile
+import httpx
 from typing import Optional
 
-app = FastAPI(title="YouTube Engine V7 - Mobile Bypass Mode")
+app = FastAPI(title="YouTube Engine V7 - Smart Hybrid Mode")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -32,12 +33,10 @@ def get_ydl_opts(extra=None):
         'no_warnings': True,
         'no_playlist': True,
         'cookiefile': get_cookies_file(),
-        # Use Mobile Client to get less IP-restricted links
-        'client_name': 'android',
-        'client_version': '19.11.38',
         'http_headers': {
-            'User-Agent': 'com.google.android.youtube/19.11.38 (Linux; U; Android 11; en_US; Pixel 4 XL; Build/RP1A.200720.009) gzip',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.youtube.com/',
         }
     }
     if extra: opts.update(extra)
@@ -86,8 +85,10 @@ async def get_info(url: str):
         if is_progressive:
             entry["url"] = f.get("url")
         else:
-            entry["video_url"] = f.get("url")
-            entry["audio_url"] = audio_url
+            # For HD/DASH, we point to our proxy to avoid 403
+            url_enc = info.get("webpage_url") or url
+            entry["video_url"] = f"/api/download?url={url_enc}&fid={f.get('fid')}"
+            entry["audio_url"] = f"/api/download?url={url_enc}&height=audio"
         formatted_formats.append(entry)
 
     return {
@@ -101,12 +102,12 @@ async def get_info(url: str):
 @app.get("/download")
 async def download(url: str, height: Optional[str] = None, fid: Optional[str] = None):
     try:
-        if fid == "None": fid = None
-        if height == "None": height = None
+        if fid == "None" or not fid: fid = None
+        if height == "None" or not height: height = None
         
         is_audio = height == 'audio'
         
-        # 1. Audio still needs server-side conversion to MP3
+        # 1. MP3 Audio (Proxy/Stream)
         if is_audio:
             async def stream_mp3():
                 with tempfile.TemporaryDirectory() as tmpdir:
@@ -128,21 +129,40 @@ async def download(url: str, height: Optional[str] = None, fid: Optional[str] = 
                             while chunk := f.read(1024*1024): yield chunk
             return StreamingResponse(stream_mp3(), media_type="audio/mpeg", headers={"Content-Disposition": 'attachment; filename="audio.mp3"'})
 
-        # 2. Video - Direct Redirect using Mobile Client headers
+        # 2. Smart Video Logic
+        # We extract format info to see if it's progressive
         fmt = fid if fid else (f'bestvideo[height<={height}]+bestaudio/best' if height else 'best')
-        def get_url():
-            # Force Android client for more flexible links
+        
+        def get_format_details():
             with yt_dlp.YoutubeDL(get_ydl_opts({'format': fmt})) as ydl:
                 info = ydl.extract_info(url, download=False)
-                if 'requested_formats' in info:
-                    return info['requested_formats'][0].get('url')
-                return info.get('url')
-        
-        direct_url = await asyncio.to_thread(get_url)
-        if direct_url:
+                # Check if it's progressive (video+audio in one)
+                is_prog = info.get('acodec') is not None and info.get('acodec') != 'none' and info.get('vcodec') != 'none'
+                # For split streams, yt-dlp requested_formats has the video part at index 0
+                direct_url = info['requested_formats'][0].get('url') if 'requested_formats' in info else info.get('url')
+                return direct_url, is_prog, info.get('title', 'video')
+
+        direct_url, is_prog, title = await asyncio.to_thread(get_format_details)
+
+        # 3. Hybrid Action
+        # If it's progressive (720p/Shorts), REDIRECT to save bandwidth
+        # If it's DASH (1080p/HD), PROXY to avoid 403
+        if is_prog:
+            print(f"[HYBRID] Redirecting progressive stream: {title}")
             return RedirectResponse(url=direct_url)
-        
-        raise HTTPException(status_code=404, detail="Format not found")
+        else:
+            print(f"[HYBRID] Proxying DASH stream: {title}")
+            async def proxy_stream():
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'}
+                async with httpx.AsyncClient(timeout=None) as client:
+                    async with client.stream("GET", direct_url, headers=headers, follow_redirects=True) as response:
+                        async for chunk in response.aiter_bytes(chunk_size=1024*1024):
+                            yield chunk
+            
+            safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+            return StreamingResponse(proxy_stream(), media_type="video/mp4", headers={
+                "Content-Disposition": f'attachment; filename="{safe_title}.mp4"'
+            })
         
     except Exception as e:
         print(f"[DOWNLOAD ERROR] {e}")
