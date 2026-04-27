@@ -4,9 +4,10 @@ import yt_dlp
 import asyncio
 import os
 import tempfile
+import httpx
 from typing import Optional
 
-app = FastAPI(title="YouTube Engine V7 - Simplified")
+app = FastAPI(title="YouTube Engine V7 - Proxy Enabled")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -101,7 +102,7 @@ async def download(url: str, height: Optional[str] = None, fid: Optional[str] = 
     try:
         is_audio = height == 'audio'
         
-        # If it's audio, we FORCE server-side download and MP3 conversion
+        # 1. Handle MP3 Conversion (Always Proxy/Stream)
         if is_audio:
             async def stream_mp3():
                 with tempfile.TemporaryDirectory() as tmpdir:
@@ -114,37 +115,43 @@ async def download(url: str, height: Optional[str] = None, fid: Optional[str] = 
                             'preferredquality': '192',
                         }]
                     })
-                    
                     def do_dl():
-                        with yt_dlp.YoutubeDL(opts) as ydl:
-                            ydl.download([url])
-                    
+                        with yt_dlp.YoutubeDL(opts) as ydl: ydl.download([url])
                     await asyncio.to_thread(do_dl)
-                    
-                    # Find the mp3 file
                     out_file = os.path.join(tmpdir, 'audio.mp3')
                     if os.path.exists(out_file):
                         with open(out_file, 'rb') as f:
-                            while chunk := f.read(1024*1024):
-                                yield chunk
-                    else:
-                        raise Exception("MP3 conversion failed")
-            
-            return StreamingResponse(stream_mp3(), media_type="audio/mpeg", headers={
-                "Content-Disposition": f'attachment; filename="audio.mp3"'
-            })
+                            while chunk := f.read(1024*1024): yield chunk
+            return StreamingResponse(stream_mp3(), media_type="audio/mpeg", headers={"Content-Disposition": 'attachment; filename="audio.mp3"'})
 
-        # For video, extract and redirect to the direct CDN link
-        fmt = fid if fid else 'best'
-        def get_url():
+        # 2. Handle Video (Proxy to avoid 403)
+        fmt = fid if fid else (f'bestvideo[height<={height}]+bestaudio/best' if height else 'best')
+        
+        def get_video_info():
             with yt_dlp.YoutubeDL(get_ydl_opts({'format': fmt})) as ydl:
-                return ydl.extract_info(url, download=False).get('url')
-        
-        direct_url = await asyncio.to_thread(get_url)
-        if direct_url:
-            return RedirectResponse(url=direct_url)
-        
-        raise HTTPException(status_code=404, detail="Format not found")
+                info = ydl.extract_info(url, download=False)
+                if 'requested_formats' in info:
+                    return info['requested_formats'][0].get('url'), info.get('title', 'video')
+                return info.get('url'), info.get('title', 'video')
+
+        direct_url, title = await asyncio.to_thread(get_video_info)
+        if not direct_url: raise Exception("No direct URL found")
+
+        # Proxy the stream to avoid 403 Forbidden
+        async def proxy_stream():
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Referer': 'https://www.youtube.com/'
+            }
+            async with httpx.AsyncClient(timeout=None) as client:
+                async with client.stream("GET", direct_url, headers=headers, follow_redirects=True) as response:
+                    async for chunk in response.aiter_bytes(chunk_size=1024*1024):
+                        yield chunk
+
+        safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+        return StreamingResponse(proxy_stream(), media_type="video/mp4", headers={
+            "Content-Disposition": f'attachment; filename="{safe_title}.mp4"'
+        })
         
     except Exception as e:
         print(f"[DOWNLOAD ERROR] {e}")
