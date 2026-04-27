@@ -4,9 +4,10 @@ import yt_dlp
 import asyncio
 import os
 import tempfile
+from pytubefix import YouTube
 from typing import Optional
 
-app = FastAPI(title="YouTube Engine V7 - Direct Redirect Mode")
+app = FastAPI(title="YouTube Engine V7 - Pytubefix Mode")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -126,16 +127,40 @@ async def download(url: str, height: Optional[str] = None, fid: Optional[str] = 
                             while chunk := f.read(1024*1024): yield chunk
             return StreamingResponse(stream_mp3(), media_type="audio/mpeg", headers={"Content-Disposition": 'attachment; filename="audio.mp3"'})
 
-        # 2. Video - Direct Redirect to CDN as requested
-        fmt = fid if fid else (f'bestvideo[height<={height}]+bestaudio/best' if height else 'best')
-        def get_url():
-            with yt_dlp.YoutubeDL(get_ydl_opts({'format': fmt})) as ydl:
-                info = ydl.extract_info(url, download=False)
-                if 'requested_formats' in info:
-                    return info['requested_formats'][0].get('url')
-                return info.get('url')
+        # 2. Video - Use pytubefix for better direct links if possible
+        def get_pt_url():
+            try:
+                yt = YouTube(url, use_oauth=False, allow_oauth_cache=True)
+                if fid:
+                    stream = yt.streams.get_by_itag(fid)
+                    if stream: return stream.url
+                
+                # If no fid or itag fails, try by height
+                if height:
+                    res = f"{height}p"
+                    stream = yt.streams.filter(res=res).first()
+                    if stream: return stream.url
+                
+                # Fallback to best progressive
+                return yt.streams.get_highest_resolution().url
+            except Exception as e:
+                print(f"[PYTUBEFIX ERROR] {e}")
+                return None
+
+        # Try pytubefix first for direct link
+        direct_url = await asyncio.to_thread(get_pt_url)
         
-        direct_url = await asyncio.to_thread(get_url)
+        # If pytubefix fails, fallback to yt-dlp
+        if not direct_url:
+            fmt = fid if fid else (f'bestvideo[height<={height}]+bestaudio/best' if height else 'best')
+            def get_ydl_url():
+                with yt_dlp.YoutubeDL(get_ydl_opts({'format': fmt})) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    if 'requested_formats' in info:
+                        return info['requested_formats'][0].get('url')
+                    return info.get('url')
+            direct_url = await asyncio.to_thread(get_ydl_url)
+
         if direct_url:
             return RedirectResponse(url=direct_url)
         
